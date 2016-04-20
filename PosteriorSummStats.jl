@@ -21,7 +21,8 @@ end
 getindex(VP::VectorPosterior,i) = VP.PP[i];
 length(VP::VectorPosterior) = length(VP.PP);
 
-function lppd{T<:Real}(pp::VectorPosterior,y::Vector{T})
+#log posterior predictive density
+function lppd{T<:AbstractVector{Real}}(pp::VectorPosterior,y::T)
   out = 0.0;
   for i in 1:length(pp)
     out += lppd(pp[i],y[pp.span[i]]);
@@ -29,18 +30,39 @@ function lppd{T<:Real}(pp::VectorPosterior,y::Vector{T})
   return out
 end
 
-function addsample!{T<:Real}(pp::VectorPosterior,ynew::Vector{T})
+function lppd{T<:Real}(pp::VectorPosterior,y::Array{T,2})
+  out = 0.0;
+  for j in 1:size(y)[2]
+    out += lppd(pp,y[:,j]);
+  end
+  return out
+end
+
+lppd{T<:Real}(pp::VectorPosterior,y::T) =
+  for i in 1:length(pp) lppd(pp[i],y); end
+
+#add one new observation
+function addsample!{T<:AbstractVector{Real}}(pp::VectorPosterior,ynew::T)
   for i in 1:length(pp) addsample!(pp[i],ynew[pp.span[i]]); end
 end
 
-function pullsample!{T<:Real}(pp::VectorPosterior,yold::Vector{T})
+addsample!{T<:Real}(pp::VectorPosterior,ynew::Array{T,2}) =
+  for i in 1:length(pp) addsample!(pp,ynew[:,j]); end
+
+addsample!{T<:Real}(pp::VectorPosterior,ynew::T) =
+  for i in 1:length(pp) addsample!(pp[i],ynew); end
+
+#remove one observation
+function pullsample!{T<:AbstractVector{Real}}(pp::VectorPosterior,yold::T)
   for i in 1:length(pp) pullsample!(pp[i],yold[pp.span[i]]); end
 end
 
-#this is a hack! should convert to taking abstract arrays
-lppd{T<:Real}(pp::VectorPosterior,y::T) = lppd(pp,[y]);
-addsample!{T<:Real}(pp::VectorPosterior,ynew::T) = addsample!(pp,[ynew]);
-pullsample!{T<:Real}(pp::VectorPosterior,yold::T) = pullsample!(pp,[yold]);
+pullsample!{T<:Real}(pp::VectorPosterior,yold::Array{T,2}) =
+  for i in 1:length(pp) pullsample!(pp,yold[:,j]); end
 
-include("/home/seth/code/logtopreg/gammapoisson.jl")
+pullsample!{T<:Real}(pp::VectorPosterior,yold::T) =
+  for i in 1:length(pp) pullsample!(pp[i],[yold]); end
+
+
+include("/home/seth/code/LogisticTopicRegression/gammapoisson.jl")
 include("/home/seth/code/polyagamma/polygamma.jl")
