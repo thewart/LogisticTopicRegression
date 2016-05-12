@@ -1,15 +1,16 @@
-function topiclmm{T<:Vector{Array{Real,2}}}(y::T,pss0::VectorPosterior,K::Int,iter::Int=1000)
+function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
+                           iter::Int=1000,thin::Int=1)
 
   ## initialize
-  pss = Array{VectorPosterior}(K);
-  map!(k -> deepcopy(pss0),pss,1:K);
+  topic = Vector{VectorPosterior}(K);
+  map!(k -> deepcopy(pss0),topic,1:K);
   n = length(y);
   nd = map(i -> size(y[i])[2],1:n);
-  z = map(d -> rand(1:K,size(d)),y);
+  z = map(d -> rand(1:K,size(d)[2]),y);
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
   for i in 1:n
-    for j in 1:nd[i] addsample!(pss[z[i][j]],y[i][:,j]); end
+    for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
 
   ν0_σ2η = 1.0;
@@ -20,11 +21,22 @@ function topiclmm{T<:Vector{Array{Real,2}}}(y::T,pss0::VectorPosterior,K::Int,it
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
   η = randn(K,n);
-  μ_η = Array{Float64}[K];
-  λ = Array{Float64}(n);
+  μ_η = Array{Float64}(K);
+  w = Array{Float64}(n);
 
-  zout = Array{Int}(n,iter);
-  ηout = Array{Float64}(K,iter);
+  saveiter = thin:thin:iter;
+  nsave = length(saveiter);
+  iter = maximum(saveiter);
+
+  post = Dict{Symbol,AbstractArray}();
+  post[:z] = Vector{Array{Int,2}}(n);
+  for i in 1:n post[:z][i] = Array{Int}(nd[i],nsave); end
+  post[:μ] = Array{Float64}(K,nsave);
+  post[:σ2] = Array{Float64}(K,nsave);
+  post[:τ] = Vector{Float64}(nsave);
+  post[:topic] = Vector{typeof(topic)}(nsave);
+  post[:η] = Array{Float64}(K,n,nsave);
+
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
 
@@ -35,18 +47,18 @@ function topiclmm{T<:Vector{Array{Real,2}}}(y::T,pss0::VectorPosterior,K::Int,it
       softmax!(π,η[:,i]);
       for j in 1:nd[i]
         zj = z[i][j];
-        pullsample!(pss[zj],y[i][:,j]);
+        pullsample!(topic[zj],y[i][:,j]);
         nk[zj,i] -= 1;
 
         for k in 1:K
           logpost[k] = log(π[k]);
-          logpost[k] += lppd(pss[k],y[i][:,j]);
+          logpost[k] += lppd(topic[k],y[i][:,j]);
         end
         logpostnorm = logpost - logsumexp(logpost);
         z[i][j] = findfirst(rand(Multinomial(1,exp(logpostnorm))));
 
-        addsample!(pss[zj],y[i][:,j]);
-        nk[zj,i] -= 1;
+        addsample!(topic[z[i][j]],y[i][:,j]);
+        nk[z[i][j],i] += 1;
       end
     end
 
@@ -57,17 +69,17 @@ function topiclmm{T<:Vector{Array{Real,2}}}(y::T,pss0::VectorPosterior,K::Int,it
       for i in 1:n
         c = logsumexp(η[setdiff(1:K,k),i]);
         ρ = η[k,i] - c;
-        λ[i] = rpolyagamma(ρ,nd[i]);
-        w[i] = nk[k,i] + nd[i]/2 + c*λ[i];
-        iV[i,i] += λ[i];
+        λ = rpolyagamma(ρ,nd[i]);
+        w[i] = nk[k,i] - nd[i]/2 + c*λ;
+        iV[i,i] += λ;
       end
       L = inv(chol(iV));
       η[k,:] = L*L'*w + L*randn(n);
 
       ## sample variance
       α = 0.5(n+ν0_σ2η);
-      β = 0.5(σ0_σ2η*ν0_σ2η + η[k,:]*iΣ_ηk*η[k,:]');
-      σ2_η[k] = rand(InverseGamma(α,β),1);
+      β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
+      σ2_η[k] = rand(InverseGamma(α,β));
 
       ## sample mean
       σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
@@ -80,13 +92,19 @@ function topiclmm{T<:Vector{Array{Real,2}}}(y::T,pss0::VectorPosterior,K::Int,it
     τ_μ = rand(InverseGamma(α,β));
 
     ## save samples
-    #zout[:,t] = z;
-    pssout[t] = deepcopy(pss);
-    ηout[:,:,t] = η;
+    if t ∈ saveiter
+      j = findin(saveiter,t)[1];
+      for i in 1:n post[:z][i][:,j] = z[i]; end
+      post[:topic][j] = deepcopy(topic);
+      post[:η][:,:,j] = η;
+      post[:μ][:,j] = μ_η;
+      post[:σ2][:,j] = σ2_η;
+      post[:τ][j] = τ_μ;
+    end
 
   end
 
-  return zout,ηout,pss
+  return post
 end
 
 function myinvcov(d::Int64,τ::Float64)
