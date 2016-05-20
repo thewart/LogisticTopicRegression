@@ -2,6 +2,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
+  Base.Test.@test maximum(pss0.span) == size(y[1])[1];
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
   n = length(y);
@@ -15,8 +16,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
 
   ν0_σ2η = 1.0;
   σ0_σ2η = 1.0;
-  τ0_τ = 1.0;
-  ν0_τ = 0.1;
+  τ0_τ = 0.25;
+  ν0_τ = 1.0;
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;

@@ -21,7 +21,7 @@ pullsample!{T<:Real}(pp::PoissonPosterior,yold::T) = pullsample!(pp,round(Int,yo
 
 function lppd(pp::PoissonPosterior,y::Int)
   p,r = ppdparam(pp);
-  return lgamma(r+y) - lgamma(r) + r*log(1-p) + y*log(p) # - lgamma(y+1) ;
+  return lgamma(r+y) - lgamma(r) + r*log(1-p) + y*log(p) - lgamma(y+1);
 end
 lppd{T<:Real}(pp::PoissonPosterior,y::T) = lppd(pp,round(Int,y));
 

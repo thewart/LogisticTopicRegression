@@ -39,8 +39,38 @@ function lppd{T<:Real}(pp::VectorPosterior,y::Array{T,2})
   return out
 end
 
-lppd{T<:Real}(pp::VectorPosterior,y::T) =
-  for i in 1:length(pp) lppd(pp[i],y); end
+#lppd{T<:Real}(pp::VectorPosterior,y::T) =
+#  for i in 1:length(pp) lppd(pp[i],y); end
+
+#log posterior predictive, integrating across indicator variables
+function lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::AbstractVector{T})
+  lp = Float64[log(π[i]) + lppd(ppv[i],y) for i in 1:length(ppv)];
+  return logsumexp(lp)
+end
+
+lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::Array{T,2}) =
+  Float64[lppd(ppv,π,y[:,i]) for i in 1:size(y)[2]]
+
+function lppd{T<:Real}(fit::Dict{Symbol,AbstractArray},y::Vector{Array{T,2}},pointwise::Bool=true)
+  n = length(y);
+  m = length(fit[:τ]);
+  nd = map(i -> size(y[i])[2],1:n);
+  lp = Array{Array{Float64,2}}(n);
+  for i in 1:n lp[i] = Array{Float64}(m,nd[i]); end
+
+  for i in 1:n
+    for j in 1:m
+      π = softmax(fit[:η][:,i,j]);
+      lp[i][j,:] = lppd(fit[:topic][j],π,y[i]);
+    end
+
+    if !pointwise lp[i] = sum(lp[i],1); end
+  end
+
+  if !pointwise lp = vcat(lp...); end
+  return lp
+end
+
 
 #add one new observation
 function addsample!{T<:Real}(pp::VectorPosterior,ynew::AbstractVector{T})
@@ -74,12 +104,15 @@ end
 
 #utilities for distribution vectors
 function rand{T<:Sampleable}(dv::Vector{T},n::Int64=1)
-  l = map(dv,length);
+  l = map(length,dv);
   p = sum(l);
   X = Array{Float64}(p,n);
   for i in 1:n
     k = 0;
-    for j in 1:p rand!(dv[j],sub(X,(k+1):(k+l[j]),i)); end
+    for j in 1:p
+      rand!(dv[j],sub(X,(k+1):(k+l[j]),i));
+      k = k + l[j];
+    end
   end
   return X
 end
