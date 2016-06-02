@@ -63,23 +63,23 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
       end
     end
 
-    iΣ_ηk = myinvcov(n,τ_μ);
+    iΣ = myinvcov(n,τ_μ);
     for k in 1:K
       ## sample η and λ
-      iV = iΣ_ηk./σ2_η[k];
+      iΣ_k = iΣ./σ2_η[k];
       for i in 1:n
         c = logsumexp(η[setdiff(1:K,k),i]);
         ρ = η[k,i] - c;
         λ = rpolyagamma(ρ,nd[i]);
         w[i] = nk[k,i] - nd[i]/2 + c*λ;
-        iV[i,i] += λ;
+        iΣ_k[i,i] += λ;
       end
-      L = inv(chol(iV));
+      L = inv(chol(iΣ_k));
       η[k,:] = L*L'*w + L*randn(n);
 
       ## sample variance
       α = 0.5(n+ν0_σ2η);
-      β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
+      β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_η*η[k,:]')[1]);
       σ2_η[k] = rand(InverseGamma(α,β));
 
       ## sample mean
