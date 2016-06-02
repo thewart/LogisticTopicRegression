@@ -1,11 +1,13 @@
-function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
-                           iter::Int=1000,thin::Int=1)
+function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,σ2_β::Float64=0.5,
+                           K::Int,iter::Int=1000,thin::Int=1)
 
   ## initialize
   Base.Test.@test maximum(pss0.span) == size(y[1])[1];
+  n = length(y);
+  Base.Test.@test size(X)[2] == n;
+
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
-  n = length(y);
   nd = map(i -> size(y[i])[2],1:n);
   z = map(d -> rand(1:K,size(d)[2]),y);
   nk = Array{Int64}(K,n);
@@ -13,6 +15,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
   for i in 1:n
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
+  XtX = X'X;
 
   ν0_σ2η = 1.0;
   σ0_σ2η = 1.0;
@@ -63,23 +66,24 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
       end
     end
 
-    iΣ_ηk = myinvcov(n,τ_μ);
+    iΣ = makecov(XtX,τ_μ,σ2_β);
     for k in 1:K
       ## sample η and λ
-      iV = iΣ_ηk./σ2_η[k];
+      iΣ_k = iΣ./σ2_η[k];
       for i in 1:n
         c = logsumexp(η[setdiff(1:K,k),i]);
         ρ = η[k,i] - c;
         λ = rpolyagamma(ρ,nd[i]);
         w[i] = nk[k,i] - nd[i]/2 + c*λ;
-        iV[i,i] += λ;
+        iΣ_k[i,i] += λ;
       end
-      L = inv(chol(iV));
+      L = inv(chol(iΣ_k));
       η[k,:] = L*L'*w + L*randn(n);
 
       ## sample variance
       α = 0.5(n+ν0_σ2η);
-      β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
+      #β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
+      β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_k*η[k,:]')[1]);
       σ2_η[k] = rand(InverseGamma(α,β));
 
       ## sample mean
@@ -108,14 +112,15 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},pss0::VectorPosterior,K::Int,
   return post
 end
 
-function myinvcov(d::Int64,τ::Float64)
-  M = Array{Float64}(d,d);
-  a = inv(1+τ) + τ^2*(d-1)/(d*τ^2 + (d+1)*τ +1);
-  b = -τ/(1+d*τ);
-  for i in 1:d
-    for j in 1:i
-      i==j ? M[i,i] = a : M[i,j] = M[j,i] = b;
+function makecov(XtX::Array{Float64,2},τ::Float64,σ2_β::Float64)
+  n = size(XtX)[1];
+  V = Array{Float64,2}(n,n);
+  for i in 1:n
+    for j in 1:n
+      V[i,j] = XtX[i,j].*σ2_β + (i==j ? 1+τ : 1);
     end
   end
-  return M
+
+  L = inv(chol(V));
+  return L*L'
 end
