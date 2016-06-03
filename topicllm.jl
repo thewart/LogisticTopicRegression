@@ -82,10 +82,10 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       η[k,:] = L*L'*w + L*randn(n);
 
       ## sample variance
-      α = 0.5(n+ν0_σ2η);
+      a = 0.5(n+ν0_σ2η);
       #β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
-      β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_k*η[k,:]')[1]);
-      σ2_η[k] = rand(InverseGamma(α,β));
+      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]);
+      σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
       σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
@@ -93,9 +93,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
     end
     ## sample variance of means
-    α = 0.5(K+ν0_τ);
-    β = 0.5(τ0_τ*ν0_τ + sum(μ_η.^2./σ2_η));
-    τ_μ = rand(InverseGamma(α,β));
+    a = 0.5(K+ν0_τ);
+    b = 0.5(τ0_τ*ν0_τ + sum(μ_η.^2./σ2_η));
+    τ_μ = rand(InverseGamma(a,b));
 
     ## save samples
     if t ∈ saveiter
