@@ -1,5 +1,5 @@
-function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,σ2_β::Float64=0.5,
-                           K::Int,iter::Int=1000,thin::Int=1)
+function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
+                           iter::Int=1000,thin::Int=1)
 
   ## initialize
   Base.Test.@test maximum(pss0.span) == size(y[1])[1];
@@ -21,6 +21,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   σ0_σ2η = 1.0;
   τ0_τ = 0.25;
   ν0_τ = 1.0;
+  τ_β = 0.5;
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -66,7 +67,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
     end
 
-    iΣ = makecov(XtX,τ_μ,σ2_β);
+    iΣ = makecov(XtX,τ_μ,τ_β);
     for k in 1:K
       ## sample η and λ
       iΣ_k = iΣ./σ2_η[k];
@@ -112,12 +113,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   return post
 end
 
-function makecov(XtX::Array{Float64,2},τ::Float64,σ2_β::Float64)
+function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
   for i in 1:n
     for j in 1:n
-      V[i,j] = XtX[i,j].*σ2_β + (i==j ? 1+τ : 1);
+      V[i,j] = XtX[i,j].*τ_β + (i==j ? 1+τ : τ);
     end
   end
 
