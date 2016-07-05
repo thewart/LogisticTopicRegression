@@ -18,6 +18,14 @@ function VectorPosterior{T<:PostPredSS}(pp::Vector{T})
   end
   VectorPosterior(pp,span)
 end
+function VectorPosterior(x...)
+  l = cumsum(collect(x[2:2:length(x)]));
+  pp = Vector{PostPredSS}(maximum(l));
+  for i in 1:maximum(l)
+    pp[i] = deepcopy(x[findfirst(l .>= i)*2 - 1]);
+  end
+  VectorPosterior(pp)
+end
 
 getindex(VP::VectorPosterior,i) = VP.PP[i];
 length(VP::VectorPosterior) = length(VP.PP);
@@ -118,4 +126,5 @@ function rand{T<:Sampleable}(dv::Vector{T},n::Int64=1)
 end
 
 include("/home/seth/code/LogisticTopicRegression/gammapoisson.jl")
+include("/home/seth/code/LogisticTopicRegression/dirichletmultinomial.jl")
 include("/home/seth/code/polyagamma/polygamma.jl")

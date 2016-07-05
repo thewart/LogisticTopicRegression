@@ -2,9 +2,15 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
-  Base.Test.@test maximum(pss0.span) == size(y[1])[1];
+  Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
   n = length(y);
   Base.Test.@test size(X)[2] == n;
+
+  ν0_σ2η = 1.0;
+  σ0_σ2η = 1.0;
+  τ0_τ = 0.25;
+  ν0_τ = 1.0;
+  τ_β = 1.0;
 
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
@@ -16,12 +22,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
   XtX = X'X;
-
-  ν0_σ2η = 1.0;
-  σ0_σ2η = 1.0;
-  τ0_τ = 0.25;
-  ν0_τ = 1.0;
-  τ_β = 0.5;
+  Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
+  Σβ = Lβ*Lβ';
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -41,6 +43,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:τ] = Vector{Float64}(nsave);
   post[:topic] = Vector{typeof(topic)}(nsave);
   post[:η] = Array{Float64}(K,n,nsave);
+  post[:β] = Array{Float64}(p,K,nsave);
 
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
@@ -101,6 +104,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     if t ∈ saveiter
       j = findin(saveiter,t)[1];
       for i in 1:n post[:z][i][:,j] = z[i]; end
+      for k in 1:K
+        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
+      end
       post[:topic][j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
@@ -125,3 +131,10 @@ function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
   L = inv(chol(V));
   return L*L'
 end
+
+function refβ(β::Array{Float64,2},refk::Int64)
+  return β .- β[:,refk]
+end
+refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk,:]
+refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
+refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
