@@ -29,7 +29,7 @@ function lppd(pp::DirMultPosterior,y::Vector{Int})
   Nprior = sum(pp.n);
   Nnew = sum(y);
   d = lgamma(Nprior) - lgamma(Nprior+Nnew) + lfact(Nnew);
-  for k in 1:K
+  for k in 1:pp.K
     d += lgamma(pp.n[k] + y[k]) - lgamma(pp.n[k]) - lfact(y[k]);
   end
   return d

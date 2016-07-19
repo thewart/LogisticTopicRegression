@@ -5,6 +5,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
   n = length(y);
   Base.Test.@test size(X)[2] == n;
+  p = size(X)[1];
 
   ν0_σ2η = 1.0;
   σ0_σ2η = 1.0;
@@ -41,7 +42,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:μ] = Array{Float64}(K,nsave);
   post[:σ2] = Array{Float64}(K,nsave);
   post[:τ] = Vector{Float64}(nsave);
-  post[:topic] = Vector{typeof(topic)}(nsave);
+  post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
 
@@ -107,7 +108,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
       end
-      post[:topic][j] = deepcopy(topic);
+      post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
       post[:σ2][:,j] = σ2_η;

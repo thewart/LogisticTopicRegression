@@ -2,7 +2,7 @@ type PoissonPosterior <: PostPredSS
   n::Float64
   ys::Float64
 end
-PoissonPosterior(n::Real,ys::Real) = PoissonPosterior(float64(n),float64(ys))
+PoissonPosterior(n::Real,ys::Real) = PoissonPosterior(Float64(n),Float64(ys))
 PoissonPosterior(y::Vector{Int},a::Float64,b::Float64) = PoissonPosterior(length(y)+b, sum(y)+a)
 
 dim(pp::PoissonPosterior) = 1;
