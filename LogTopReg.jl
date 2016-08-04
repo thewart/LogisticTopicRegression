@@ -17,6 +17,7 @@ export
   VectorPosterior,
   PoissonPosterior,
   DirMultPosterior,
+  CategoricalPosterior,
 
   #functions
   refβ,
@@ -24,6 +25,7 @@ export
   addsample!,
   pullsample!,
   topicpd,
+  topicppd,
   softmax,
   vcat,
   getindex,
@@ -36,6 +38,7 @@ export
 include("vectorposterior.jl")
 include("gammapoisson.jl");
 include("dirichletmultinomial.jl");
+include("categorical.jl")
 include("topicllm.jl");
 
 end

@@ -11,7 +11,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   σ0_σ2η = 1.0;
   τ0_τ = 0.25;
   ν0_τ = 1.0;
-  τ_β = 1.0;
+  τ_β = 0.5;
 
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);

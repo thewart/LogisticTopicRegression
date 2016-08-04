@@ -29,3 +29,7 @@ lppd{T<:Real}(pp::PoissonPosterior,y::T) = lppd(pp,round(Int,y));
 function topicpd(pp::PoissonPosterior)
   return Gamma(pp.ys,inv(pp.n))
 end
+
+function topicppd(pp::PoissonPosterior)
+  return NegativeBinomial(pp.ys,1-inv(pp.n+1))
+end

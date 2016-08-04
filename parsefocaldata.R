@@ -1,3 +1,29 @@
+defaultstate <- function() list(act=c("Rest","GroomGIVE","GroomGET","Feed","Travel"),
+                                corr=c("OutCorral","InCorral"),
+                                passetho=c("nopascon","passcont"),
+                                inf=c("NoGrmInf","GromInf"))
+
+defaultpoint <- function() data.table(behavior=c("Scratch","SelfGrm","Vigilnce","threat","avoid","displace","FearGrm","Submit",
+                                                 "noncontactAgg","contactAgg","Approach","Leave","PsCnTerm","InsptInf",
+                                                 "AffVoc","GrmTerm","GrmPrsnt","ChinThrst","SexPresent","Mount"),
+                                      modifier=c(NA,NA,NA,"Direction","Winner","Winner","Direction","Direction",
+                                                 "Direction","Direction","Initiate","Initiate","Initiate",NA,
+                                                 "Direction","Initiate","Direction","Direction",NA,NA))
+
+defaultpoint2 <- function() {
+  direct <- "direct'n\\(\\w+\\)"
+  winner <- "winner\\?\\(\\w+\\)"
+  init <- "initiate\\(\\w+\\)"
+  return(list(Scratch=NA, SelfGrm=NA, Vigilnce=NA, threat=direct, avoid=winner, displace=winner, FearGrm=direct, 
+              Submit=direct, noncontactAgg=direct, contactAgg=direct, Approach=init, Leave=init, PsCnTerm=init, 
+              InsptInf=NA, AffVoc=direct, GrmTerm=init, GrmPrsnt=direct, ChinThrst=direct, SexPresent=NA, Mount= NA))
+}
+
+eventslices <- function(X,ptetho) {
+  if (is.list(ptetho)) ptetho <- names(ptetho)
+  return(names(X)[sapply(ptetho,function(x) str_detect(names(X),paste0("^",x)) %>% which) %>% unlist])
+}
+
 derepeat <- function(behav) {
   n <- length(behav)
   x <- !logical(n)
@@ -51,25 +77,29 @@ countprep <- function(behav,dat) {
   
   pt <- dat[,length(EventName),by=c("Observation","Behavior")]
   pt <- dcast(pt,Observation ~ Behavior,fill=0)
-  pt <- pt[,c(1,which(names(pt) %in% behav)),with=F]
+  pt <- pt[,c(1,sapply(names(pt),function(x) str_detect(x,pattern = behav) %>% any) %>% which),with=F]
+  setcolorder(pt,c("Observation",eventslices(pt,behav)))
   return(pt)
 }
 
-defaultstate <- function() list(act=c("Rest","GroomGIVE","GroomGET","Feed","Travel"),
-                                corr=c("OutCorral","InCorral"),
-                                passetho=c("nopascon","passcont"),
-                                inf=c("NoGrmInf","GromInf"))
-
-defaultpoint <- function() c("Scratch","SelfGrm","Vigilnce","threat","avoid","FearGrm","Submit","noncontactAgg","contactAgg","Approach","Leave","InsptInf",
-                             "AffVoc","GrmTerm","GrmPrsnt","ChinThrst")
-
+eventsplit <- function(behav,ptetho,modifier,n) {
+  if (!(behav %in% names(ptetho)) || (get(behav,ptetho) %>% is.na))
+    return(rep(behav,n))
+  else { 
+    guh <- str_replace_all(modifier," ","") %>% str_extract(pattern=get(behav,ptetho))
+    guh[is.na(guh)] <- rep(behav,sum(is.na(guh)))
+    guh[!is.na(guh)] <- paste0(behav,":",guh[!is.na(guh)])
+    return(guh)
+  }
+}
+                             
 collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=60)
 {
   if (is.null(stetho))
     stetho <- defaultstate()
   
   if (is.null(ptetho))   
-    ptetho <- defaultpoint()
+    ptetho <- defaultpoint2()
   
   bdat <- list()
   for (i in 1:length(files)) {
@@ -87,12 +117,17 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=60)
   #colnames(sdat) <- unlist(statetho)
   
   #construct count data
+  
+  if (is.list(ptetho)) {
+    bdat[,Behavior:=eventsplit(.BY[[1]],ptetho,BehaviorModifier,.N),by=Behavior]
+    ptetho <- names(ptetho)
+  }
+  
   Xc <- countprep(ptetho,bdat)
   X <- merge(Xc,Xs)
   l <- length(X)
   X <- merge(X,unique(bdat[,cbind(Observation,FocalID,Observer,Year)]),by="Observation")
   setcolorder(X,c(1,(l+1):(l+3),2:l))
-  setcolorder(X,c(names(X)[1:4],ptetho,unlist(stetho)))
   setkey(X,"FocalID")
   return(X)
 }

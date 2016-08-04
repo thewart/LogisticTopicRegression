@@ -113,6 +113,12 @@ function topicpd(pp::VectorPosterior)
   return topic
 end
 
+function topicppd(pp::VectorPosterior)
+  topic = Vector{Sampleable}(length(pp));
+  for i in 1:length(pp) topic[i] = topicppd(pp[i]); end
+  return topic
+end
+
 #utilities for distribution vectors
 function rand{T<:Sampleable}(dv::Vector{T},n::Int64=1)
   l = map(length,dv);
