@@ -45,7 +45,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
-  post[:lpΘ] = zeros(Float64,nsave);
+  post[:lpθ] = zeros(Float64,nsave);
   post[:loglik] = Array{Float64,2}(n,nsave);
 
   ηcpd = Vector{MultivariateNormal}(K);
@@ -122,7 +122,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
-        post[:lpΘ][j] += logpdf(ηcpd[k],η[k,:]')[1] + logpdf(σ2cpd[k],σ2_η[k]);
+          post[:lpθ][j] += logpdf(ηcpd[k],η[k,:]')[1] + logpdf(σ2cpd[k],σ2_η[k]);
       end
       post[:lpΘ][j] += logpdf(τcpd,τ_μ);
       post[:topic][:,j] = deepcopy(topic);

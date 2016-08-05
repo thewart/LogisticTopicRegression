@@ -64,7 +64,7 @@ end
 function lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::Array{T,2})
   n = size(y)[2];
   lp = Vector{Float64}(n);
-  for i in 1:n lp[n]  = lppd(ppv,π,y[:,i]); end
+  for i in 1:n lp[i]  = lppd(ppv,π,y[:,i]); end
   return lp
 end
 
@@ -121,7 +121,7 @@ end
 
 function topicppd(pp::VectorPosterior)
   topic = Vector{Sampleable}(length(pp));
-  for i in 1:length(pp) topic[i] = topicpd(pp[i]); end
+  for i in 1:length(pp) topic[i] = topicppd(pp[i]); end
   return topic
 end
 
