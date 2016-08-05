@@ -124,7 +124,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
           post[:lpθ][j] += logpdf(ηcpd[k],η[k,:]')[1] + logpdf(σ2cpd[k],σ2_η[k]);
       end
-      post[:lpΘ][j] += logpdf(τcpd,τ_μ);
+      post[:lpθ][j] += logpdf(τcpd,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
