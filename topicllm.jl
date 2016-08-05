@@ -45,6 +45,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
+  post[:lpΘ] = zeros(Float64,nsave);
+  post[:loglik] = Array{Float64,2}(n,nsave);
+
+  ηcpd = Vector{MultivariateNormal}(K);
+  σ2cpd = Vector{InverseGamma}(K);
+  τcpd = Vector{InverseGamma}(K);
 
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
@@ -82,32 +88,43 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         w[i] = nk[k,i] - nd[i]/2 + c*λ;
         iΣ_k[i,i] += λ;
       end
+
       L = inv(chol(iΣ_k));
-      η[k,:] = L*L'*w + L*randn(n);
+      ηcpd[k] = MultivariateNormal(L*L'*w,L*L');
+      #η[k,:] = L*L'*w + L*randn(n);
+      η[k,:] = rand(ηcpd[k]);
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
       #β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
       b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]);
-      σ2_η[k] = rand(InverseGamma(a,b));
+      σ2cpd[k] =  InverseGamma(a,b);
+      σ2_η[k] = rand(σ2cpd[k]);
 
       ## sample mean
       σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
       μhat = σ2hat*sum(η[k,:])/σ2_η[k];
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
+
     end
     ## sample variance of means
     a = 0.5(K+ν0_τ);
     b = 0.5(τ0_τ*ν0_τ + sum(μ_η.^2./σ2_η));
-    τ_μ = rand(InverseGamma(a,b));
+    τcpd = InverseGamma(a,b);
+    τ_μ = rand(τcpd);
 
     ## save samples
     if t ∈ saveiter
       j = findin(saveiter,t)[1];
-      for i in 1:n post[:z][i][:,j] = z[i]; end
+      for i in 1:n
+        post[:z][i][:,j] = z[i];
+        post[:loglik][i,j] = sum(lppd(topic,softmax(η[:,i]),y[i]));
+      end
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
+        post[:lpΘ][j] += logpdf(ηcpd[k],η[k,:]')[1] + logpdf(σ2cpd[k],σ2_η[k]);
       end
+      post[:lpΘ][j] += logpdf(τcpd,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;

@@ -5,7 +5,7 @@ fpath <- paste0(basepath,c("F2013/Txtexports_all_processed.csv"))
 ptetho <- defaultpoint2()
 #ptetho <- c("AffVoc","Approach","FearGrm","Leave","Submit","Vigilnce","avoid","contactAgg","displace","noncontactAgg","threat")
 stetho <- defaultstate()
-Y <- collectfocal(fpath,ptetho,stetho)
+Y <- collectfocal(fpath,names(ptetho),stetho)
 Y <- Y[FocalID %in% Y[,length(Observation),by=FocalID][V1>10,FocalID]] 
 filt <- Y[,lapply(.SD,function(x) mean(x>0)),.SD=eventslices(Y,ptetho)] > 0.005
 filt <- colnames(filt)[filt]

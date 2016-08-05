@@ -55,12 +55,18 @@ end
 
 #log posterior predictive, integrating across indicator variables
 function lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::AbstractVector{T})
-  lp = Float64[log(π[i]) + lppd(ppv[i],y) for i in 1:length(ppv)];
+  K = length(ppv);
+  lp = Vector{Float64}(K);
+  for k in 1:K lp[k] = log(π[k]) + lppd(ppv[k],y); end
   return logsumexp(lp)
 end
 
-lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::Array{T,2}) =
-  Float64[lppd(ppv,π,y[:,i]) for i in 1:size(y)[2]]
+function lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::Array{T,2})
+  n = size(y)[2];
+  lp = Vector{Float64}(n);
+  for i in 1:n lp[n]  = lppd(ppv,π,y[:,i]); end
+  return lp
+end
 
 function lppd{T<:Real}(fit::Dict{Symbol,AbstractArray},y::Vector{Array{T,2}},pointwise::Bool=true)
   n = length(y);
@@ -115,7 +121,7 @@ end
 
 function topicppd(pp::VectorPosterior)
   topic = Vector{Sampleable}(length(pp));
-  for i in 1:length(pp) topic[i] = topicppd(pp[i]); end
+  for i in 1:length(pp) topic[i] = topicpd(pp[i]); end
   return topic
 end
 
