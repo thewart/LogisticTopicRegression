@@ -28,5 +28,5 @@ function topicpd(pp::CategoricalPosterior)
 end
 
 function topicppd(pp::CategoricalPosterior)
-  return Categorical(pp.n)
+  return Categorical(pp.n./sum(pp.n))
 end

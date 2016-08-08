@@ -93,7 +93,7 @@ eventsplit <- function(behav,ptetho,modifier,n) {
   }
 }
                              
-collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=60)
+collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=10)
 {
   if (is.null(stetho))
     stetho <- defaultstate()

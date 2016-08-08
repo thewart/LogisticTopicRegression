@@ -13,10 +13,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   ν0_τ = 1.0;
   τ_β = 0.5;
 
+  #K0 = rand(round(Int64,K/2):K);
+  K0 = K;
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
   nd = map(i -> size(y[i])[2],1:n);
-  z = map(d -> rand(1:K,size(d)[2]),y);
+  z = map(d -> rand(1:K0,size(d)[2]),y);
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
   for i in 1:n
@@ -25,6 +27,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   XtX = X'X;
   Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
   Σβ = Lβ*Lβ';
+
+  σ2prior = InverseGamma(0.5*ν0_σ2η,0.5*σ0_σ2η*ν0_σ2η);
+  τprior = InverseGamma(0.5*ν0_τ,0.5*τ0_τ*ν0_τ);
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -55,6 +60,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
 
+  iΣ = makecov(XtX,τ_μ,τ_β);
+
   for t in 1:iter
 
     ##  sample topic memberships
@@ -77,7 +84,6 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
     end
 
-    iΣ = makecov(XtX,τ_μ,τ_β);
     for k in 1:K
       ## sample η and λ
       iΣ_k = iΣ./σ2_η[k];
@@ -90,16 +96,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
 
       L = inv(chol(iΣ_k));
-      ηcpd[k] = MultivariateNormal(L*L'*w,L*L');
-      #η[k,:] = L*L'*w + L*randn(n);
-      η[k,:] = rand(ηcpd[k]);
+      η[k,:] = L*L'*w + L*randn(n);
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
-      #β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
       b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]);
-      σ2cpd[k] =  InverseGamma(a,b);
-      σ2_η[k] = rand(σ2cpd[k]);
+      σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
       σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
@@ -110,8 +112,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     ## sample variance of means
     a = 0.5(K+ν0_τ);
     b = 0.5(τ0_τ*ν0_τ + sum(μ_η.^2./σ2_η));
-    τcpd = InverseGamma(a,b);
-    τ_μ = rand(τcpd);
+    τ_μ = rand(InverseGamma(a,b));
+
+    iΣ = makecov(XtX,τ_μ,τ_β);
 
     ## save samples
     if t ∈ saveiter
@@ -122,9 +125,10 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
-          post[:lpθ][j] += logpdf(ηcpd[k],η[k,:]')[1] + logpdf(σ2cpd[k],σ2_η[k]);
+          post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:]')[1] +
+                          logpdf(σ2prior,σ2_η[k]);
       end
-      post[:lpθ][j] += logpdf(τcpd,τ_μ);
+      post[:lpθ][j] += logpdf(τprior,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
