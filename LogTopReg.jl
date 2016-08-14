@@ -21,6 +21,7 @@ export
 
   #functions
   refβ,
+  writefit,
   lppd,
   addsample!,
   pullsample!,

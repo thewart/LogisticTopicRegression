@@ -3,6 +3,18 @@ defaultstate <- function() list(act=c("Rest","GroomGIVE","GroomGET","Feed","Trav
                                 passetho=c("nopascon","passcont"),
                                 inf=c("NoGrmInf","GromInf"))
 
+defaultstate2 <- function() {
+  self <- "Self-Directed"
+  aff <- "affiliative"
+  naff <- "non-affiliative"
+  misc <- "misc"
+  data.table(behavior=c("Rest","GroomGIVE","GroomGET","Feed","Travel",
+                                                  "OutCorral","InCorral","nopascon","passcont","NoGrmInf","GromInf"),
+                                       state=c(rep("Activity",5),rep("Corral",2),rep("PassiveContact",2),rep("GroomInfant",2)),
+                                       baseline=c(T,F,F,F,F,T,F,T,F,T,F),
+                                       type=c(self,aff,aff,self,self,self,self,naff,aff,misc,misc))
+}
+
 defaultpoint <- function() data.table(behavior=c("Scratch","SelfGrm","Vigilnce","threat","avoid","displace","FearGrm","Submit",
                                                  "noncontactAgg","contactAgg","Approach","Leave","PsCnTerm","InsptInf",
                                                  "AffVoc","GrmTerm","GrmPrsnt","ChinThrst","SexPresent","Mount"),
@@ -14,13 +26,25 @@ defaultpoint2 <- function() {
   direct <- "direct'n\\(\\w+\\)"
   winner <- "winner\\?\\(\\w+\\)"
   init <- "initiate\\(\\w+\\)"
-  return(list(Scratch=NA, SelfGrm=NA, Vigilnce=NA, threat=direct, avoid=winner, displace=winner, FearGrm=direct, 
-              Submit=direct, noncontactAgg=direct, contactAgg=direct, Approach=init, Leave=init, PsCnTerm=init, 
-              InsptInf=NA, AffVoc=direct, GrmTerm=init, GrmPrsnt=direct, ChinThrst=direct, SexPresent=NA, Mount= NA))
+  self <- "Self-Directed"
+  aff <- "affiliative"
+  naff <- "non-affiliative"
+  misc <- "misc"
+  data.table(behavior=c("Scratch","SelfGrm","Vigilnce","threat","avoid","displace","FearGrm","Submit",
+             "noncontactAgg","contactAgg","Approach","Leave","PsCnTerm","InsptInf",
+             "AffVoc","GrmTerm","GrmPrsnt","ChinThrst","SexPresent","Mount"),
+             modifier=c(NA,NA,NA,direct,winner,winner,direct,direct,direct,direct,
+                        init,init,init,NA,direct,init,direct,direct,NA,NA),
+             type=c(self,self,self,naff,naff,naff,naff,naff,naff,naff,aff,aff,aff,misc,aff,aff,aff,misc,misc,misc))
+               
+  # return(list(Scratch=NA, SelfGrm=NA, Vigilnce=NA, threat=direct, avoid=winner, displace=winner, FearGrm=direct, 
+  #             Submit=direct, noncontactAgg=direct, contactAgg=direct, Approach=init, Leave=init, PsCnTerm=init, 
+  #             InsptInf=NA, AffVoc=direct, GrmTerm=init, GrmPrsnt=direct, ChinThrst=direct, SexPresent=NA, Mount= NA))
 }
 
+#identify behaviors that are derivatives of top-level ethogram behaviors
 eventslices <- function(X,ptetho) {
-  if (is.list(ptetho)) ptetho <- names(ptetho)
+  if (is.list(ptetho)) ptetho <- ptetho$behavior
   return(names(X)[sapply(ptetho,function(x) str_detect(names(X),paste0("^",x)) %>% which) %>% unlist])
 }
 
@@ -61,7 +85,7 @@ statprep <- function(stat,dat,maxsec=630,nsec=10,ctmc=F) {
       sdat <- rbind(sdat,zilch)
     }
     
-    out <- dcast(melt(sdat), Observation ~ behavior)
+    out <- melt(sdat)[,variable:=NULL]
     
   } else {
     sdat <- sdat[sdat[,derepeat(V1),by=c("Observation")]$V1]
@@ -82,11 +106,12 @@ countprep <- function(behav,dat) {
   return(pt)
 }
 
+#divide behaviors in ptetho based on matching to modifiers
 eventsplit <- function(behav,ptetho,modifier,n) {
-  if (!(behav %in% names(ptetho)) || (get(behav,ptetho) %>% is.na))
+  if (!(behav %in% ptetho$behavior) || (ptetho[behavior==behav,is.na(modifier)]))
     return(rep(behav,n))
   else { 
-    guh <- str_replace_all(modifier," ","") %>% str_extract(pattern=get(behav,ptetho))
+    guh <- str_replace_all(modifier," ","") %>% str_extract(pattern=ptetho[behavior==behav,modifier])
     guh[is.na(guh)] <- rep(behav,sum(is.na(guh)))
     guh[!is.na(guh)] <- paste0(behav,":",guh[!is.na(guh)])
     return(guh)
@@ -110,17 +135,14 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=10)
   
   #construct state data
   ss <- sapply(stetho,length)
-  sdat <- lapply(stetho,statprep,dat=bdat,nsec=nsec)
-  Xs <- sdat[[1]]
-  if (length(sdat)>1) for (i in 2:length(sdat)) Xs <- merge(Xs,sdat[[i]])
-  #sdat <- unlist(lapply(sdat,as.vector)) %>% matrix(ncol=sum(sapply(statetho,length)))
-  #colnames(sdat) <- unlist(statetho)
-  
+  Xs <- stetho[,statprep(behavior,dat = bdat,nsec = nsec),by=state] %>% 
+    dcast(Observation ~ behavior,value.var="value")
+
   #construct count data
   
   if (is.list(ptetho)) {
     bdat[,Behavior:=eventsplit(.BY[[1]],ptetho,BehaviorModifier,.N),by=Behavior]
-    ptetho <- names(ptetho)
+    ptetho <- ptetho$behavior
   }
   
   Xc <- countprep(ptetho,bdat)
