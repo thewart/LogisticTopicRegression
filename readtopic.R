@@ -1,6 +1,8 @@
 path <- "/home/seth/analysis/logtopreg/fit43/"
 d <- scan(paste0(path,"dims.csv")) %>% as.list
 names(d) <- c("n","K","p","b","nsave")
+etho <- rbind(ptetho[,c(1,3),with=F],stetho[,c(1,4),with=F])
+
 mu <- fread(paste0(path,"mu.csv"),header = F)
 mu$iter <-1:d$nsave
 mu <- melt(mu,id.vars="iter",variable.name = "topic")
@@ -17,12 +19,16 @@ topicmeans <- topic[iter>100,.(value=mean(value)),by=.(behav,topic)] %>%
   merge(nzmu[iter>100,.(value=mean(value)),by=topic],by="topic")
 
 #visualize bivariate relationships between behaviors
-ggplot(topicmeans,aes(x=Feed,y=Vigilnce,color=topic,size=value)) + geom_point()
+ggplot(topicmeans,aes(x=GroomGET,y=GroomGIVE,color=topic,size=value)) + geom_point()
 ggplot(topicmeans,aes(y=`noncontactAgg:direct'n(give)`,x=`Approach:initiate(focal)`,color=topic,size=value)) + geom_point()
 
 #visualize entire topics
-topicsummary <- topic[iter > 100 & topic %in% nzmu$topic,.(topic,value=(value-1)/max(value-1)),by=.(behav,iter)] %>% 
-  .[,.(value=mean(value)),by=.(topic,behav)]
+topicsummary <- topic[iter > 100 & topic %in% nzmu$topic & value > 1.1,
+                      .(topic,value=(value-1)/max(value-1)),by=.(behav,iter)] %>% 
+  .[,.(value=mean(value)),by=.(topic,behav)] 
+topicsummary[,type:=etho[str_detect(.BY[[1]],paste0("^",etho$behavior)),type],by=behav]
+ggplot(topicsummary[topic %in% c("V12","V11","V7")],aes(y=value,x=topic,fill=type,label=behav)) + geom_point() +
+  geom_label_repel() + coord_cartesian(ylim = c(0,1)) + theme_classic()
 
 #monkey-specific topic probs
 eta <- data.table(FocalID=Y[,unique(FocalID)] %>% rep(.,rep(d$K,d$n)),

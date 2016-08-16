@@ -9,9 +9,10 @@ Y <- collectfocal(fpath,ptetho,stetho)
 Y <- Y[FocalID %in% Y[,length(Observation),by=FocalID][V1>10,FocalID]] 
 
 #remove behaviors that happen too infrequenlty and baseline state behaviors
-filt <- Y[,lapply(.SD,function(x) mean(x>0)),.SD=eventslices(Y,ptetho)] > 0.004
+filt <- Y[,lapply(.SD,function(x) mean(x>0)),.SD=eventslices(names(Y),ptetho)] > 0.004
 filt <- colnames(filt)[!filt] %>% c(stetho[baseline==T,behavior]) %>% unique()
 Y <- Y[,-filt,with=F]
+Yraw <- copy(Y)
 
 #discritize!!
 Y <- cbind(Y[,.(FocalID,Observation,Year)],Y[,lapply(.SD,function(x) 

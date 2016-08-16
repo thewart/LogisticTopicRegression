@@ -45,7 +45,7 @@ defaultpoint2 <- function() {
 #identify behaviors that are derivatives of top-level ethogram behaviors
 eventslices <- function(X,ptetho) {
   if (is.list(ptetho)) ptetho <- ptetho$behavior
-  return(names(X)[sapply(ptetho,function(x) str_detect(names(X),paste0("^",x)) %>% which) %>% unlist])
+  return(X[sapply(ptetho,function(x) str_detect(X,paste0("^",x)) %>% which) %>% unlist %>% unique])
 }
 
 derepeat <- function(behav) {
@@ -102,7 +102,7 @@ countprep <- function(behav,dat) {
   pt <- dat[,length(EventName),by=c("Observation","Behavior")]
   pt <- dcast(pt,Observation ~ Behavior,fill=0)
   pt <- pt[,c(1,sapply(names(pt),function(x) str_detect(x,pattern = behav) %>% any) %>% which),with=F]
-  setcolorder(pt,c("Observation",eventslices(pt,behav)))
+  setcolorder(pt,c("Observation",eventslices(names(pt),behav)))
   return(pt)
 }
 
@@ -136,7 +136,7 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=10)
   #construct state data
   ss <- sapply(stetho,length)
   Xs <- stetho[,statprep(behavior,dat = bdat,nsec = nsec),by=state] %>% 
-    dcast(Observation ~ behavior,value.var="value")
+    dcast(Observation ~ behavior,value.var="value") %>% setcolorder(c("Observation",stetho$behavior))
 
   #construct count data
   
