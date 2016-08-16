@@ -41,3 +41,11 @@ ggplot(eta[iter>100,.(value=mean(value),sex=unique(sex)),by=.(FocalID,topic)],ae
 
 #residuals
 resid <-eta[iter>100,mean(value),by=.(FocalID,topic)][,.(FocalID,topic,value=V1-mu[iter>100,mean(value),by=topic]$V1)]
+
+#regression coefficients
+beta <- data.table(topic=paste0("V",1:d$K) %>% rep(.,rep(d$p,d$K)),
+                   coeff=rep(1:d$p,rep(d$K,d$p)),
+                   iter=rep(1:d$nsave,rep(d$p*d$K,d$nsave)),
+                   beta=scan(paste0(path,"topicmean.csv")))
+tphat <- beta[,.(FocalID=Xdf$FocalID,tphat=X %*% beta),by=.(topic,iter)]
+tphat <- merge(tphat,mu,by="topic") %>% .[,tphat:=tphat+mu] %>% .[,mu:=NULL]
