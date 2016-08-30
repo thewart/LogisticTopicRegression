@@ -5,8 +5,8 @@ defaultstate <- function() list(act=c("Rest","GroomGIVE","GroomGET","Feed","Trav
 
 defaultstate2 <- function() {
   self <- "Self-Directed"
-  aff <- "affiliative"
-  naff <- "non-affiliative"
+  aff <- "Affiliative"
+  naff <- "Agonistic"
   misc <- "misc"
   data.table(behavior=c("Rest","GroomGIVE","GroomGET","Feed","Travel",
                                                   "OutCorral","InCorral","nopascon","passcont","NoGrmInf","GromInf"),
@@ -27,8 +27,8 @@ defaultpoint2 <- function() {
   winner <- "winner\\?\\(\\w+\\)"
   init <- "initiate\\(\\w+\\)"
   self <- "Self-Directed"
-  aff <- "affiliative"
-  naff <- "non-affiliative"
+  aff <- "Affiliative"
+  naff <- "Agonistic"
   misc <- "misc"
   data.table(behavior=c("Scratch","SelfGrm","Vigilnce","threat","avoid","displace","FearGrm","Submit",
              "noncontactAgg","contactAgg","Approach","Leave","PsCnTerm","InsptInf",
@@ -104,6 +104,17 @@ countprep <- function(behav,dat) {
   pt <- pt[,c(1,sapply(names(pt),function(x) str_detect(x,pattern = behav) %>% any) %>% which),with=F]
   setcolorder(pt,c("Observation",eventslices(names(pt),behav)))
   return(pt)
+}
+
+scanprep <- function(dat) {
+  dat <- dat[Behavior=="scan",.(In2mCode,
+                          N2m=sapply(RelativeEventTime,function(x) abs(x-c(0,300,600)) %>% which.min)),
+       by=.(FocalID,Observation)]
+  dat[,In2mPart:=!(In2mCode %in% c("In 2m? (8)","In 2m? (0)"))]
+  
+  return(merge(dat[,sum(In2mPart),by=.(Observation,N2m)] %>% dcast(Observation ~ N2m,fill = 0),
+  dat[,.(uprox=length(unique(In2mCode[In2mPart]))),by=Observation]))
+  
 }
 
 #divide behaviors in ptetho based on matching to modifiers
