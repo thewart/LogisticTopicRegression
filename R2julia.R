@@ -2,14 +2,14 @@ source("/home/seth/code/LogisticTopicRegression/parsefocaldata.R")
 source("/home/seth/Dropbox/monkeybris/rscript/getAge.R")
 basepath <- "~/Dropbox/focaldata_processed/"
 fpath <- paste0(basepath,c("F2013/Txtexports_all_processed.csv"))
-ptetho <- defaultpoint2()
+ptetho <- defaultpoint2()[type!="misc"]
 #ptetho <- c("AffVoc","Approach","FearGrm","Leave","Submit","Vigilnce","avoid","contactAgg","displace","noncontactAgg","threat")
-stetho <- defaultstate2()
+stetho <- defaultstate2()[type!="misc"]
 Y <- collectfocal(fpath,ptetho,stetho)
 Y <- Y[FocalID %in% Y[,length(Observation),by=FocalID][V1>10,FocalID]] 
 
 #remove behaviors that happen too infrequenlty and baseline state behaviors
-filt <- Y[,lapply(.SD,function(x) mean(x>0)),.SD=eventslices(names(Y),ptetho)] > 0.004
+filt <- Y[,lapply(.SD,function(x) mean(x>0)),.SD=eventslices(names(Y),ptetho)] > 0.005
 filt <- colnames(filt)[!filt] %>% c(stetho[baseline==T,behavior]) %>% unique()
 Y <- Y[,-filt,with=F]
 Yraw <- copy(Y)

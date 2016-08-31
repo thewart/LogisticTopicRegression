@@ -65,7 +65,7 @@ statvect <- function(time,behav,states) {
   return(out)
 }
 
-statprep <- function(stat,dat,maxsec=630,nsec=10,ctmc=F) {
+statprep <- function(stat,dat,maxsec=630,nsec=NA,ctmc=F) {
   sdat <- dat[Behavior %in% stat,.(Observation,FocalID,Behavior,RelativeEventTime,Duration)]
   sdat <- sdat[RelativeEventTime<maxsec]
   zilch <- dat[!(Observation %in% sdat$Observation),unique(Observation)]
@@ -75,7 +75,10 @@ statprep <- function(stat,dat,maxsec=630,nsec=10,ctmc=F) {
   
   if (!ctmc) {
     sdat[,V3:=pmin(V3,maxsec-V2)]
-    sdat <- sdat[,.(time=sum(round(V3/nsec))),by=c("Observation","V1")]
+    if (!is.na(nsec))
+      sdat <- sdat[,.(time=sum(round(V3/nsec))),by=c("Observation","V1")]
+    else
+      sdat <- sdat[,.(time=sum(V3)),by=c("Observation","V1")]
     sdat <- sdat[,statvect(time,V1,stat),by=c("Observation")]
     sdat$behavior <- stat
     
@@ -112,8 +115,7 @@ scanprep <- function(dat) {
        by=.(FocalID,Observation)]
   dat[,In2mPart:=!(In2mCode %in% c("In 2m? (8)","In 2m? (0)"))]
   
-  return(merge(dat[,sum(In2mPart),by=.(Observation,N2m)] %>% dcast(Observation ~ N2m,fill = 0),
-  dat[,.(uprox=length(unique(In2mCode[In2mPart]))),by=Observation]))
+  return(dat[,.(ScanProx=length(unique(N2m[In2mPart])),ScanProxInd=length(unique(In2mCode[In2mPart]))),by=Observation])
   
 }
 
@@ -129,7 +131,7 @@ eventsplit <- function(behav,ptetho,modifier,n) {
   }
 }
                              
-collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=10)
+collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA)
 {
   if (is.null(stetho))
     stetho <- defaultstate()
@@ -150,14 +152,16 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=10)
     dcast(Observation ~ behavior,value.var="value") %>% setcolorder(c("Observation",stetho$behavior))
 
   #construct count data
-  
   if (is.list(ptetho)) {
     bdat[,Behavior:=eventsplit(.BY[[1]],ptetho,BehaviorModifier,.N),by=Behavior]
     ptetho <- ptetho$behavior
   }
-  
   Xc <- countprep(ptetho,bdat)
-  X <- merge(Xc,Xs)
+  
+  #construct proximity data
+  Xp <- scanprep(bdat)
+  
+  X <- merge(Xc,Xs) %>% merge(Xp)
   l <- length(X)
   X <- merge(X,unique(bdat[,cbind(Observation,FocalID,Observer,Year)]),by="Observation")
   setcolorder(X,c(1,(l+1):(l+3),2:l))
