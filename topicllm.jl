@@ -1,4 +1,5 @@
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
+                           hy::Dict{Symbol,Float64}=hyperparameter(),
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
@@ -7,11 +8,11 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   Base.Test.@test size(X)[2] == n;
   p = size(X)[1];
 
-  ν0_σ2η = 1.0;
-  σ0_σ2η = 1.0;
-  τ0_τ = 0.25;
-  ν0_τ = 1.0;
-  τ_β = 0.5;
+  ν0_σ2η = hy[:ν0_σ2η];
+  σ0_σ2η = hy[:σ0_σ2η];
+  τ0_τ = hy[:τ0_τ];
+  ν0_τ = hy[:ν0_τ];
+  τ_β = hy[:τ_β];
 
   #K0 = rand(round(Int64,K/2):K);
   K0 = K;
@@ -41,7 +42,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   nsave = length(saveiter);
   iter = maximum(saveiter);
 
-  post = Dict{Symbol,AbstractArray}();
+  post = Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}}();
   post[:z] = Vector{Array{Int,2}}(n);
   for i in 1:n post[:z][i] = Array{Int}(nd[i],nsave); end
   post[:μ] = Array{Float64}(K,nsave);
@@ -52,6 +53,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:β] = Array{Float64}(p,K,nsave);
   post[:lpθ] = zeros(Float64,nsave);
   post[:loglik] = Array{Float64,2}(n,nsave);
+  post[:hyperparameter] = hy;
 
   ηcpd = Vector{MultivariateNormal}(K);
   σ2cpd = Vector{InverseGamma}(K);
@@ -74,10 +76,10 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
         for k in 1:K
           logpost[k] = log(π[k]);
-          logpost[k] += lppd(topic[k],y[i][:,j]);
+          logpost[k] += lppd(y[i][:,j],topic[k]);
         end
         logpostnorm = logpost - logsumexp(logpost);
-        z[i][j] = findfirst(rand(Multinomial(1,exp(logpostnorm))));
+        z[i][j] = rand(Categorical(exp(logpostnorm))));
 
         addsample!(topic[z[i][j]],y[i][:,j]);
         nk[z[i][j],i] += 1;
@@ -121,7 +123,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       j = findin(saveiter,t)[1];
       for i in 1:n
         post[:z][i][:,j] = z[i];
-        post[:loglik][i,j] = sum(lppd(topic,softmax(η[:,i]),y[i]));
+        post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
       end
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
@@ -145,13 +147,19 @@ function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
   for i in 1:n
-    for j in 1:n
-      V[i,j] = XtX[i,j].*τ_β + (i==j ? 1+τ : τ);
+    for j in i:n
+      V[j,i] = XtX[j,i].*τ_β + (i==j ? 1+τ : τ);
     end
   end
 
   L = inv(chol(V));
   return L*L'
+end
+
+function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
+  τ0_τ = 0.25,ν0_τ = 1.0,τ_β = 1.0)
+  return Dict(:ν0_σ2η => ν0_σ2η, :σ0_σ2η => σ0_σ2η, :τ0_τ => τ0_τ,
+  :ν0_τ => ν0_τ, :τ_β => τ_β)
 end
 
 function refβ(β::Array{Float64,2},refk::Int64)

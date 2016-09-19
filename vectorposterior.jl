@@ -36,58 +36,6 @@ function vcat{T<:PostPredSS}(VP::Union{VectorPosterior,T}...)
   return VectorPosterior(cat)
 end
 
-#log posterior predictive density
-function lppd{T<:Real}(pp::VectorPosterior,y::AbstractVector{T})
-  out = 0.0;
-  for i in 1:length(pp)
-    out += lppd(pp[i],y[pp.span[i]]);
-  end
-  return out
-end
-
-function lppd{T<:Real}(pp::VectorPosterior,y::Array{T,2})
-  out = 0.0;
-  for j in 1:size(y)[2]
-    out += lppd(pp,y[:,j]);
-  end
-  return out
-end
-
-#log posterior predictive, integrating across indicator variables
-function lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::AbstractVector{T})
-  K = length(ppv);
-  lp = Vector{Float64}(K);
-  for k in 1:K lp[k] = log(π[k]) + lppd(ppv[k],y); end
-  return logsumexp(lp)
-end
-
-function lppd{T<:Real}(ppv::Vector{VectorPosterior},π::Vector{Float64},y::Array{T,2})
-  n = size(y)[2];
-  lp = Vector{Float64}(n);
-  for i in 1:n lp[i]  = lppd(ppv,π,y[:,i]); end
-  return lp
-end
-
-function lppd{T<:Real}(fit::Dict{Symbol,AbstractArray},y::Vector{Array{T,2}},pointwise::Bool=true)
-  n = length(y);
-  m = length(fit[:τ]);
-  nd = map(i -> size(y[i])[2],1:n);
-  lp = Array{Array{Float64,2}}(n);
-  for i in 1:n lp[i] = Array{Float64}(m,nd[i]); end
-
-  for i in 1:n
-    for j in 1:m
-      π = softmax(fit[:η][:,i,j]);
-      lp[i][j,:] = lppd(fit[:topic][:,j],π,y[i]);
-    end
-
-    if !pointwise lp[i] = sum(lp[i],2); end
-  end
-
-  if !pointwise lp = hcat(lp...); end
-  return lp
-end
-
 
 #add one new observation
 function addsample!{T<:Real}(pp::VectorPosterior,ynew::AbstractVector{T})

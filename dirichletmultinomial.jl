@@ -25,7 +25,7 @@ end
 pullsample!{T<:Real}(pp::DirMultPosterior,yold::Vector{T}) =
     pullsample!(pp,round(Int64,yold));
 
-function lppd(pp::DirMultPosterior,y::Vector{Int})
+function lppd(y::Vector{Int},pp::DirMultPosterior)
   Nprior = sum(pp.n);
   Nnew = sum(y);
   d = lgamma(Nprior) - lgamma(Nprior+Nnew) + lfact(Nnew);
@@ -34,7 +34,7 @@ function lppd(pp::DirMultPosterior,y::Vector{Int})
   end
   return d
 end
-lppd{T<:Real}(pp::DirMultPosterior,y::Vector{T}) = lppd(pp,round(Int64,y));
+lppd{T<:Real}(y::Vector{T},pp::DirMultPosterior) = lppd(pp,round(Int64,y));
 
 function topicpd(pp::DirMultPosterior)
   return Dirichlet(pp.n)

@@ -19,12 +19,12 @@ function pullsample!(pp::PoissonPosterior,yold::Int)
 end
 pullsample!{T<:Real}(pp::PoissonPosterior,yold::T) = pullsample!(pp,round(Int,yold));
 
-function lppd(pp::PoissonPosterior,y::Int)
+function lppd(y::Int,pp::PoissonPosterior)
   p = inv(pp.n+1);
   r = pp.ys;
   return lgamma(r+y) - lgamma(r) + r*log(1-p) + y*log(p) - lgamma(y+1);
 end
-lppd{T<:Real}(pp::PoissonPosterior,y::T) = lppd(pp,round(Int,y));
+lppd{T<:Real}(y::T,pp::PoissonPosterior) = lppd(round(Int,y),pp);
 
 function topicpd(pp::PoissonPosterior)
   return Gamma(pp.ys,inv(pp.n))

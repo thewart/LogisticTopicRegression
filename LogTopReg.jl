@@ -20,6 +20,7 @@ export
   CategoricalPosterior,
 
   #functions
+  hyperparameter,
   refβ,
   writefit,
   lppd,
@@ -41,5 +42,6 @@ include("gammapoisson.jl");
 include("dirichletmultinomial.jl");
 include("categorical.jl")
 include("topicllm.jl");
+include("prediction.jl")
 
 end

@@ -17,11 +17,11 @@ function pullsample!(pp::CategoricalPosterior,yold::Int64) pp.n[yold] -= 1.0; en
 pullsample!{T<:Real}(pp::DirMultPosterior,yold::T) =
   pullsample!(pp,round(Int64,yold));
 
-function lppd(pp::CategoricalPosterior,y::Int64)
+function lppd(y::Int64,pp::CategoricalPosterior)
   N = sum(pp.n);
   return lgamma(N) - lgamma(N+1) + lgamma(pp.n[y]+1.0) - lgamma(pp.n[y])
 end
-lppd{T<:Real}(pp::CategoricalPosterior,y::Vector{T}) = lppd(pp,round(Int64,y));
+lppd{T<:Real}(y::Vector{T},pp::CategoricalPosterior) = lppd(pp,round(Int64,y));
 
 function topicpd(pp::CategoricalPosterior)
   return Dirichlet(pp.n)
