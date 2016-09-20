@@ -55,14 +55,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:loglik] = Array{Float64,2}(n,nsave);
   post[:hyperparameter] = hy;
 
-  ηcpd = Vector{MultivariateNormal}(K);
-  σ2cpd = Vector{InverseGamma}(K);
-  τcpd = Vector{InverseGamma}(K);
-
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
-
-  iΣ = makecov(XtX,τ_μ,τ_β);
 
   for t in 1:iter
 
@@ -88,7 +82,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
     for k in 1:K
       ## sample η and λ
-      iΣ_k = iΣ./σ2_η[k];
+      iΣ = makecov(XtX,A,σ2_η[k],τ_μ,τ_β,τ_A[k]);
       for i in 1:n
         c = logsumexp(η[setdiff(1:K,k),i]);
         ρ = η[k,i] - c;
@@ -102,7 +96,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
-      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]);
+      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]*σ2_η[k]);
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
@@ -143,12 +137,13 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   return post
 end
 
-function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
+function makecov(XtX::Array{Float64,2},A::Array{Float64,2},σ2::Float64,
+  τ::Float64,τ_β::Float64,τ_A)
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
   for i in 1:n
     for j in i:n
-      V[j,i] = XtX[j,i].*τ_β + (i==j ? 1+τ : τ);
+      V[j,i] = (XtX[j,i]*τ_β + A[j,i]*τ_A + (i==j ? 1+τ : τ))*σ2;
     end
   end
 
