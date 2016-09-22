@@ -79,7 +79,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
           logpost[k] += lppd(y[i][:,j],topic[k]);
         end
         logpostnorm = logpost - logsumexp(logpost);
-        z[i][j] = rand(Categorical(exp(logpostnorm))));
+        z[i][j] = rand(Categorical(exp(logpostnorm)));
 
         addsample!(topic[z[i][j]],y[i][:,j]);
         nk[z[i][j],i] += 1;
@@ -147,7 +147,7 @@ function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
   for i in 1:n
-    for j in i:n
+    for j in 1:n
       V[j,i] = XtX[j,i].*τ_β + (i==j ? 1+τ : τ);
     end
   end
