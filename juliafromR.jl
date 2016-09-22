@@ -2,7 +2,7 @@ function getfocaldata()
   R"source('/home/seth/code/LogisticTopicRegression/R2julia.R')";
   X = @> rcopy("X") transpose();
 
-  nc = rcopy("length(Y)-3");
+  nc = Int64(rcopy("length(Y)-3"));
   k = @>> rcopy("Y[,lapply(.SD,
     function(x) length(unique(x))),.SD=-(1:3)]") convert(Array{Int64}) vec();
   pss0 = VectorPosterior(CategoricalPosterior(k[1]),1);
