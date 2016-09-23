@@ -92,11 +92,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
 
       L = inv(chol(iΣ_k));
-      η[k,:] = L*L'*w + L*randn(n);
+      ηk = L*L'*w + L*randn(n);
+      η[k,:] = ηk;
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
-      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]*σ2_η[k]);
+      b = 0.5(σ0_σ2η*ν0_σ2η + dot(ηk,iΣ*ηk));
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
