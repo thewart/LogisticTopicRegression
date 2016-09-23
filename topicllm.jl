@@ -51,7 +51,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
-  #post[:lpθ] = zeros(Float64,nsave);
+  post[:lpθ] = zeros(Float64,nsave);
   post[:loglik] = Array{Float64,2}(n,nsave);
   post[:hyperparameter] = hy;
 
@@ -97,13 +97,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         iΣ_k[i,i] += λ;
       end
 
-      L = inv(chol(Hermitian(iΣ_k)));
-      ηk = L*L'*w + L*randn(n);
-      η[k,:] = ηk;
+      L = inv(chol(iΣ_k));
+      η[k,:] = L*L'*w + L*randn(n);
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
-      b = 0.5(σ0_σ2η*ν0_σ2η + dot(ηk,iΣ*ηk));
+      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]);
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
@@ -127,11 +126,11 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
       end
       for k in 1:K
-        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
-          #post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
-          #                logpdf(σ2prior,σ2_η[k]);
+        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
+          post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:]')[1] +
+                          logpdf(σ2prior,σ2_η[k]);
       end
-      #post[:lpθ][j] += logpdf(τprior,τ_μ);
+      post[:lpθ][j] += logpdf(τprior,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
@@ -170,7 +169,7 @@ refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
 
-function writefit(fit::Dict{Symbol,AbstractArray},path::String)
+function writefit(fit::Dict{Symbol,AbstractArray},path::ASCIIString)
   if !isdir(path) mkpath(path); end
   n = length(fit[:z]);
   K,nsave = size(fit[:topic]);
