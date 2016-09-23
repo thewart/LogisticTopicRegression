@@ -10,7 +10,7 @@ end
 function lppd{T<:Real}(y::Array{T,2},pp::VectorPosterior)
   out = 0.0;
   for j in 1:size(y)[2]
-    out += lppd(pp,y[:,j]);
+    out += lppd(y[:,j],pp);
   end
   return out
 end
