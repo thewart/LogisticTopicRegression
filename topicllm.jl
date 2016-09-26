@@ -97,7 +97,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         iΣ_k[i,i] += λ;
       end
 
-      L = inv(chol(iΣ_k));
+      L = inv(chol(Hermitian(iΣ_k)));
       ηk = L*L'*w + L*randn(n);
       η[k,:] = ηk;
 
@@ -128,8 +128,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       end
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
-          post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
-                          logpdf(σ2prior,σ2_η[k]);
+        #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
+        #                  logpdf(σ2prior,σ2_η[k]);
       end
       post[:lpθ][j] += logpdf(τprior,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
