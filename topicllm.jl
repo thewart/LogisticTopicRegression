@@ -125,7 +125,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
         #                  logpdf(σ2prior,σ2_η[k]);
       end
-      post[:lpθ][j] += logpdf(τprior,τ_μ);
+      #post[:lpθ][j] += logpdf(τprior,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
