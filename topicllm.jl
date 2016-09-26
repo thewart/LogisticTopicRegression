@@ -1,6 +1,6 @@
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
-                           hy::Dict{Symbol,Float64}=hyperparameter(),
-                           iter::Int=1000,thin::Int=1)
+                           hy::Dict{Symbol,Float64}=hyperparameter();
+                           iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
 
   ## initialize
   Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
@@ -51,8 +51,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
-  post[:lpθ] = zeros(Float64,nsave);
-  post[:loglik] = Array{Float64,2}(n,nsave);
+  if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   post[:hyperparameter] = hy;
 
   ηcpd = Vector{MultivariateNormal}(K);
@@ -124,7 +123,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       j = findin(saveiter,t)[1];
       for i in 1:n
         post[:z][i][:,j] = z[i];
-        post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
+        if report_loglik, post[:loglik][i,j] =
+          sum(lppd(y[i],topic,softmax(η[:,i]))); end
       end
       for k in 1:K
         post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
