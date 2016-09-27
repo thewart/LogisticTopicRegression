@@ -127,7 +127,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
           sum(lppd(y[i],topic,softmax(η[:,i]))); end
       end
       for k in 1:K
-        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
+        post[:β][:,k,j] = σ2_η[k]*Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
         #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
         #                  logpdf(σ2prior,σ2_η[k]);
       end
