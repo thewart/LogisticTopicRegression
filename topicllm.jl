@@ -27,10 +27,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   end
   XtX = X'X;
   Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
-  Σβ = Lβ*Lβ';
-
-  σ2prior = InverseGamma(0.5*ν0_σ2η,0.5*σ0_σ2η*ν0_σ2η);
-  τprior = InverseGamma(0.5*ν0_τ,0.5*τ0_τ*ν0_τ);
+  ΣβX = X*Lβ*Lβ';
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -126,7 +123,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
           sum(lppd(y[i],topic,softmax(η[:,i]))); end
       end
       for k in 1:K
-        post[:β][:,k,j] = σ2_η[k]*Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
+        post[:β][:,k,j] = ΣβX*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
         #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
         #                  logpdf(σ2prior,σ2_η[k]);
       end
