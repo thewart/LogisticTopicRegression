@@ -96,8 +96,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         iΣ_k[i,i] += λ;
       end
 
-      L = inv(chol(Hermitian(iΣ_k)));
-      ηk = L*L'*w + L*randn(n);
+      ηk = iΣ_k \ w + chol(Hermitian(iΣ_k)) \ randn(n);
       η[k,:] = ηk;
 
       ## sample variance
@@ -153,8 +152,7 @@ function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
     end
   end
 
-  L = inv(chol(V));
-  return L*L'
+  return inv(V)
 end
 
 function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
