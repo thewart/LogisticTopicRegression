@@ -26,11 +26,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
   XtX = X'X;
-  Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
-  Σβ = Lβ*Lβ';
-
-  σ2prior = InverseGamma(0.5*ν0_σ2η,0.5*σ0_σ2η*ν0_σ2η);
-  τprior = InverseGamma(0.5*ν0_τ,0.5*τ0_τ*ν0_τ);
+  LA = chol(A)';
+  Aeig = svd(A);
+  Ainv = inv(A);
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -95,13 +93,26 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
-      b = 0.5(σ0_σ2η*ν0_σ2η + dot(ηk,iΣ*ηk));
+      b = 0.5(σ0_σ2η*ν0_σ2η + inv(σ2_η[k])*dot(ηk,iΣ*ηk));
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
       σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
       μhat = σ2hat*sum(η[k,:])/σ2_η[k];
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
+
+      resid .= η[k,:] .- μ_η[k];
+
+      ## sample reg coeffs
+      innerV = Aeig[3] * inv(Diagonal(τ_A[k].*Aeig[2])+I) * Aeig[1];
+      Vβ = X*innerV*X' + I/τ_β[k];
+      β[:,k] = Vβ \ (X*resid) + sqrt(σ2_η[k]).*chol(Vβ) \ randn(p);
+
+      resid .-= X'β[:,k];
+
+      ## sample genetic effects
+      Vg = Ainv./τ_A[k] + I;
+      g = Vg \ (g'resid) + sqrt(σ2_η[k]).*chol(Vg) \ randn(p);
 
     end
     ## sample variance of means
@@ -119,12 +130,6 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         if report_loglik, post[:loglik][i,j] =
           sum(lppd(y[i],topic,softmax(η[:,i]))); end
       end
-      for k in 1:K
-        post[:β][:,k,j] = σ2_η[k]*Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
-        #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
-        #                  logpdf(σ2prior,σ2_η[k]);
-      end
-      #post[:lpθ][j] += logpdf(τprior,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
@@ -142,7 +147,7 @@ function makecov(XtX::Array{Float64,2},A::Array{Float64,2},σ2::Float64,
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
   for i in 1:n
-    for j in i:n
+    for j in 1:n
       V[j,i] = (XtX[j,i]*τ_β + A[j,i]*τ_A + (i==j ? 1+τ : τ))*σ2;
     end
   end
