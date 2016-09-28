@@ -114,6 +114,11 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       Vg = Ainv./τ_A[k] + I;
       g = Vg \ (g'resid) + sqrt(σ2_η[k]).*chol(Vg) \ randn(p);
 
+      ## sample genetic variance component
+      a = 0.5(n+ν0_A);
+      b = 0.5(τ0_A*ν0_A + sum(g.^2./σ2_η));
+      τ_A[k] = rand(InverseGamma(a,b));
+
     end
     ## sample variance of means
     a = 0.5(K+ν0_τ);
