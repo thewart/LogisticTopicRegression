@@ -27,7 +27,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   end
   XtX = X'X;
   Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
-  ΣβX = X*Lβ*Lβ';
+  ΣβX = Lβ*Lβ'*X;
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -119,8 +119,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       j = findin(saveiter,t)[1];
       for i in 1:n
         post[:z][i][:,j] = z[i];
-        if report_loglik, post[:loglik][i,j] =
-          sum(lppd(y[i],topic,softmax(η[:,i]))); end
+        if report_loglik
+          post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
+        end
       end
       for k in 1:K
         post[:β][:,k,j] = ΣβX*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
