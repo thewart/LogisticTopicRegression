@@ -1,6 +1,6 @@
-function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
-                           hy::Dict{Symbol,Float64}=hyperparameter();
-                           iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
+function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Float64,2},
+  pss0::VectorPosterior,K::Int,hy::Dict{Symbol,Float64}=hyperparameter();
+  iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
 
   ## initialize
   Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
@@ -13,6 +13,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   τ0_τ = hy[:τ0_τ];
   ν0_τ = hy[:ν0_τ];
   τ_β = hy[:τ_β];
+  τ0_A = hy[:τ0_A];
+  ν0_A = hy[:ν0_A];
 
   #K0 = rand(round(Int64,K/2):K);
   K0 = K;
@@ -26,15 +28,20 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
   XtX = X'X;
-  LA = chol(A)';
   Aeig = svd(A);
   Ainv = inv(A);
+  Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
+  ΣβX = Lβ*Lβ'*X;
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
+  τ_A = rand(K);
   η = randn(K,n);
   μ_η = Array{Float64}(K);
   w = Array{Float64}(n);
+  β = Array{Float64,2}(p,K);
+
+  resid = Vector{Float64}(n);
 
   saveiter = thin:thin:iter;
   nsave = length(saveiter);
@@ -79,7 +86,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
     for k in 1:K
       ## sample η and λ
-      iΣ = makecov(XtX,A,σ2_η[k],τ_μ,τ_β,τ_A[k]);
+      iΣ_k = makecov(XtX,A,σ2_η[k],τ_μ,τ_β,τ_A[k]);
       for i in 1:n
         c = logsumexp(η[setdiff(1:K,k),i]);
         ρ = η[k,i] - c;
@@ -93,7 +100,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
       ## sample variance
       a = 0.5(n+ν0_σ2η);
-      b = 0.5(σ0_σ2η*ν0_σ2η + inv(σ2_η[k])*dot(ηk,iΣ*ηk));
+      b = 0.5(σ0_σ2η*ν0_σ2η + inv(σ2_η[k])*dot(ηk,iΣ_k*ηk));
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
@@ -104,19 +111,19 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       resid .= η[k,:] .- μ_η[k];
 
       ## sample reg coeffs
-      innerV = Aeig[3] * inv(Diagonal(τ_A[k].*Aeig[2])+I) * Aeig[1];
-      Vβ = X*innerV*X' + I/τ_β[k];
-      β[:,k] = Vβ \ (X*resid) + sqrt(σ2_η[k]).*chol(Vβ) \ randn(p);
+      innerV = Aeig[3] * inv(Diagonal(τ_A[k].*Aeig[2])+I) * Aeig[1]';
+      Vβ = X*innerV*X' + I/τ_β;
+      β[:,k] = Vβ \ (X*resid) + sqrt(σ2_η[k]).*chol(Hermitian(Vβ)) \ randn(p);
 
       resid .-= X'β[:,k];
 
       ## sample genetic effects
       Vg = Ainv./τ_A[k] + I;
-      g = Vg \ (g'resid) + sqrt(σ2_η[k]).*chol(Vg) \ randn(p);
+      g = Vg \ resid + sqrt(σ2_η[k]).*chol(Hermitian(Vg)) \ randn(n);
 
       ## sample genetic variance component
       a = 0.5(n+ν0_A);
-      b = 0.5(τ0_A*ν0_A + sum(g.^2./σ2_η));
+      b = 0.5(τ0_A*ν0_A + sum(g.^2./σ2_η[k]));
       τ_A[k] = rand(InverseGamma(a,b));
 
     end
@@ -125,15 +132,14 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     b = 0.5(τ0_τ*ν0_τ + sum(μ_η.^2./σ2_η));
     τ_μ = rand(InverseGamma(a,b));
 
-    iΣ = makecov(XtX,τ_μ,τ_β);
-
     ## save samples
     if t ∈ saveiter
       j = findin(saveiter,t)[1];
       for i in 1:n
         post[:z][i][:,j] = z[i];
-        if report_loglik, post[:loglik][i,j] =
-          sum(lppd(y[i],topic,softmax(η[:,i]))); end
+        if report_loglik
+          post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
+        end
       end
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
@@ -161,9 +167,9 @@ function makecov(XtX::Array{Float64,2},A::Array{Float64,2},σ2::Float64,
 end
 
 function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
-  τ0_τ = 0.25,ν0_τ = 1.0,τ_β = 1.0)
+  ν0_τ = 1.0,τ0_τ = 0.25,τ_β = 1.0,ν0_A = 1.0,τ0_A = 0.25)
   return Dict(:ν0_σ2η => ν0_σ2η, :σ0_σ2η => σ0_σ2η, :τ0_τ => τ0_τ,
-  :ν0_τ => ν0_τ, :τ_β => τ_β)
+  :ν0_τ => ν0_τ, :τ_β => τ_β, :ν0_A => ν0_A, :τ0_A => τ0_A)
 end
 
 function refβ(β::Array{Float64,2},refk::Int64)
