@@ -160,9 +160,9 @@ function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
 end
 
 function refβ(β::Array{Float64,2},refk::Int64)
-  return β .- β[:,refk]
+  return β .- β[:,refk:refk]
 end
-refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk,:]
+refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk:refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
 
