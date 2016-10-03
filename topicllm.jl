@@ -1,6 +1,6 @@
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
-                           hy::Dict{Symbol,Float64}=hyperparameter(),
-                           iter::Int=1000,thin::Int=1)
+                           hy::Dict{Symbol,Float64}=hyperparameter();
+                           iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
 
   ## initialize
   Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
@@ -27,10 +27,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   end
   XtX = X'X;
   Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
-  Σβ = Lβ*Lβ';
-
-  σ2prior = InverseGamma(0.5*ν0_σ2η,0.5*σ0_σ2η*ν0_σ2η);
-  τprior = InverseGamma(0.5*ν0_τ,0.5*τ0_τ*ν0_τ);
+  ΣβX = Lβ*Lβ'*X;
 
   σ2_η = fill(1.0,K);
   τ_μ = 0.1;
@@ -51,8 +48,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
-  post[:lpθ] = zeros(Float64,nsave);
-  post[:loglik] = Array{Float64,2}(n,nsave);
+  if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   post[:hyperparameter] = hy;
 
   ηcpd = Vector{MultivariateNormal}(K);
@@ -97,8 +93,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         iΣ_k[i,i] += λ;
       end
 
-      L = inv(chol(iΣ_k));
-      ηk = L*L'*w + L*randn(n);
+      ηk = iΣ_k \ w + chol(Hermitian(iΣ_k)) \ randn(n);
       η[k,:] = ηk;
 
       ## sample variance
@@ -124,14 +119,16 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       j = findin(saveiter,t)[1];
       for i in 1:n
         post[:z][i][:,j] = z[i];
-        post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
+        if report_loglik
+          post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
+        end
       end
       for k in 1:K
-        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
-          post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:]')[1] +
-                          logpdf(σ2prior,σ2_η[k]);
+        post[:β][:,k,j] = ΣβX*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
+        #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
+        #                  logpdf(σ2prior,σ2_η[k]);
       end
-      post[:lpθ][j] += logpdf(τprior,τ_μ);
+      #post[:lpθ][j] += logpdf(τprior,τ_μ);
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
@@ -153,8 +150,7 @@ function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
     end
   end
 
-  L = inv(chol(V));
-  return L*L'
+  return inv(V)
 end
 
 function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
@@ -164,9 +160,9 @@ function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
 end
 
 function refβ(β::Array{Float64,2},refk::Int64)
-  return β .- β[:,refk]
+  return β .- β[:,refk:refk]
 end
-refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk,:]
+refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk:refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
 
