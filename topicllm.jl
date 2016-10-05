@@ -19,7 +19,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   map!(k -> deepcopy(pss0),topic,1:K);
   nd = map(i -> size(y[i])[2],1:n);
 
-  wv = weights(rand(Dirichlet(K,1/K)));
+  wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
   z = map(d -> sample(1:K,wv,size(d)[2]),y);
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
@@ -30,9 +30,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   Lβ = inv( chol(X*X' + diagm(fill(1/τ_β,p)) ));
   ΣβX = Lβ*Lβ'*X;
 
-  σ2_η = fill(1.0,K);
-  τ_μ = 0.1;
-  η = randn(K,n);
+  σ2_η = rand(K)*2;
+  τ_μ = rand()*2;
+  η = randn(K,n)*2;
   μ_η = Array{Float64}(K);
   w = Array{Float64}(n);
 
