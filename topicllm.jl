@@ -17,11 +17,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
   ν0_A = hy[:ν0_A];
 
   #K0 = rand(round(Int64,K/2):K);
-  K0 = K;
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
   nd = map(i -> size(y[i])[2],1:n);
-  z = map(d -> rand(1:K0,size(d)[2]),y);
+
+  wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
+  z = map(d -> sample(1:K,wv,size(d)[2]),y);
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
   for i in 1:n
@@ -30,13 +31,13 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
   XtX = X'X;
   Aeig = svd(A);
   Ainv = inv(A);
-  Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
+  Lβ = inv( chol(X*X' + diagm(fill(1/τ_β,p)) ));
   ΣβX = Lβ*Lβ'*X;
 
-  σ2_η = fill(1.0,K);
-  τ_μ = 0.1;
-  τ_A = rand(K);
-  η = randn(K,n);
+  σ2_η = rand(K)*2;
+  τ_μ = rand()*2;
+  η = randn(K,n)*2;
+  τ_A = rand(K)*2;
   μ_η = Array{Float64}(K);
   w = Array{Float64}(n);
   β = Array{Float64,2}(p,K);
@@ -173,9 +174,9 @@ function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
 end
 
 function refβ(β::Array{Float64,2},refk::Int64)
-  return β .- β[:,refk]
+  return β .- β[:,refk:refk]
 end
-refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk,:]
+refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk:refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
 
