@@ -15,18 +15,19 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   τ_β = hy[:τ_β];
 
   #K0 = rand(round(Int64,K/2):K);
-  K0 = K;
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
   nd = map(i -> size(y[i])[2],1:n);
-  z = map(d -> rand(1:K0,size(d)[2]),y);
+
+  wv = weights(rand(Dirichlet(K,1/K)));
+  z = map(d -> sample(1:K,wv,size(d)[2]),y);
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
   for i in 1:n
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
   XtX = X'X;
-  Lβ = inv( chol(X*X' + diagm(fill(τ_β,p)) ));
+  Lβ = inv( chol(X*X' + diagm(fill(1/τ_β,p)) ));
   ΣβX = Lβ*Lβ'*X;
 
   σ2_η = fill(1.0,K);
