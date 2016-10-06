@@ -53,10 +53,11 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
   for i in 1:n post[:z][i] = Array{Int}(nd[i],nsave); end
   post[:μ] = Array{Float64}(K,nsave);
   post[:σ2] = Array{Float64}(K,nsave);
-  post[:τ] = Vector{Float64}(nsave);
+  post[:τ_μ] = Vector{Float64}(nsave);
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
+  post[:τ_A] = Array{Float64}(K,nsave);
   if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   post[:hyperparameter] = hy;
 
@@ -146,7 +147,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
       post[:σ2][:,j] = σ2_η;
-      post[:τ][j] = τ_μ;
+      post[:τ_μ][j] = τ_μ;
+      post[:τ_A][:,j] = τ_A;
     end
 
   end
