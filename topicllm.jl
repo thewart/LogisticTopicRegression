@@ -29,6 +29,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   XtX = X'X;
   Lβ = inv( chol(X*X' + diagm(fill(1/τ_β,p)) ));
   ΣβX = Lβ*Lβ'*X;
+  invaddIτXtX = inv(I+τ_β*XtX);
+  suminvaddIτXtX = sum(invaddIτXtX);
 
   σ2_η = rand(K)*2;
   τ_μ = rand()*2;
@@ -103,8 +105,10 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
-      σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
-      μhat = σ2hat*sum(η[k,:])/σ2_η[k];
+      σ2hat = σ2_η[k]/(1/τ_β + suminvaddIτXtX);
+      μhat = σ2hat/σ2_η[k]*sum(invaddIτXtX*η[k,:]);
+      #σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
+      #μhat = σ2hat*sum(η[k,:])/σ2_η[k];
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
 
     end
@@ -151,6 +155,18 @@ function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
     end
   end
 
+  return inv(V)
+end
+
+function precisionsum(a::Float64,B::Tuple{Float64,Union{UniformScaling,Array{Float64,2}}}...)
+  n = size(B[2])[1];
+  V = Array{Float64,2}(n,n);
+  for i in 1:n
+    for j in 1:n
+      V[i,j] = a;
+      for k in 1:length(B) V[i,j] += B[k][1]*B[k][2][i,j]; end
+    end
+  end
   return inv(V)
 end
 
