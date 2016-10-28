@@ -1,5 +1,6 @@
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
                            hy::Dict{Symbol,Float64}=hyperparameter();
+                           zinit::Vector{Vector{Int64}}=Vector{Vector{Int64}}(),
                            iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
 
   ## initialize
@@ -19,8 +20,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   map!(k -> deepcopy(pss0),topic,1:K);
   nd = map(i -> size(y[i])[2],1:n);
 
-  wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
-  z = map(d -> sample(1:K,wv,size(d)[2]),y);
+  if isempty(zinit)
+    wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
+    z = map(d -> sample(1:K,wv,size(d)[2]),y);
+  else
+    z = zinit;
+  end
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
   for i in 1:n
@@ -53,10 +58,6 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:β] = Array{Float64}(p,K,nsave);
   if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   post[:hyperparameter] = hy;
-
-  ηcpd = Vector{MultivariateNormal}(K);
-  σ2cpd = Vector{InverseGamma}(K);
-  τcpd = Vector{InverseGamma}(K);
 
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
@@ -105,7 +106,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
-      σ2hat = σ2_η[k]/(1/τ_β + suminvaddIτXtX);
+      σ2hat = σ2_η[k]/(1/τ_μ + suminvaddIτXtX);
       μhat = σ2hat/σ2_η[k]*sum(invaddIτXtX*η[k,:]);
       #σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
       #μhat = σ2hat*sum(η[k,:])/σ2_η[k];
