@@ -4,7 +4,7 @@ function getfocaldata()
 
   nc = Int64(rcopy("length(Y)-3"));
   k = @>> rcopy("Y[,lapply(.SD,
-    function(x) length(unique(x))),.SD=-(1:3)]") convert(Array{Int64}) vec();
+    function(x) length(unique(x))),.SD=-(1:3)] %>% as.matrix") convert(Array{Int64}) vec();
   pss0 = VectorPosterior(CategoricalPosterior(k[1]),1);
   for i in 2:nc pss0 = vcat(pss0,CategoricalPosterior(k[i])); end
 

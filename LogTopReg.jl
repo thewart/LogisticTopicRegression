@@ -20,6 +20,7 @@ export
   CategoricalPosterior,
 
   #functions
+  simplemix,
   hyperparameter,
   refβ,
   writefit,
@@ -43,5 +44,6 @@ include("dirichletmultinomial.jl");
 include("categorical.jl")
 include("topicllm.jl");
 include("prediction.jl")
+include("simplemix.jl")
 
 end

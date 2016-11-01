@@ -1,5 +1,6 @@
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Float64,2},
   pss0::VectorPosterior,K::Int,hy::Dict{Symbol,Float64}=hyperparameter();
+  zinit::Vector{Vector{Int64}}=Vector{Vector{Int64}}(),
   iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
 
   ## initialize
@@ -21,8 +22,12 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
   map!(k -> deepcopy(pss0),topic,1:K);
   nd = map(i -> size(y[i])[2],1:n);
 
-  wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
-  z = map(d -> sample(1:K,wv,size(d)[2]),y);
+  if isempty(zinit)
+    wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
+    z = map(d -> sample(1:K,wv,size(d)[2]),y);
+  else
+    z = zinit;
+  end
   nk = Array{Int64}(K,n);
   for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
   for i in 1:n
@@ -31,8 +36,16 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
   XtX = X'X;
   Aeig = svd(A);
   Ainv = inv(A);
-  Lβ = inv( chol(X*X' + diagm(fill(1/τ_β,p)) ));
-  ΣβX = Lβ*Lβ'*X;
+  #Lβ = inv( chol(X*X' + diagm(fill(1/τ_β,p)) ));
+  #ΣβX = Lβ*Lβ'*X;
+  #invaddIτXtX = inv(I+τ_β*XtX);
+  #suminvaddIτXtX = sum(invaddIτXtX);
+
+  IXAeig = svd(convert(Array{Float64,2},
+    chol(I + τ_β*XtX)),convert(Array{Float64,2},chol(A)));
+  iU = inv(IXAeig[6]*IXAeig[3]');
+  λ_IX = Diagonal(IXAeig[4]);
+  λ_A = Diagonal(IXAeig[5]);
 
   σ2_η = rand(K)*2;
   τ_μ = rand()*2;
@@ -106,8 +119,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
-      σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
-      μhat = σ2hat*sum(η[k,:])/σ2_η[k];
+      Vμ = iU*inv(λ_IX.^2 + τ_A[k].*λ_A)*iU';
+      σ2hat = σ2_η[k]/(1/τ_μ + sum(Vμ));
+      μhat = σ2hat/σ2_η[k]*sum(Vμ*η[k,:]);
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
 
       resid .= η[k,:] .- μ_η[k];
@@ -115,7 +129,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},A::Array{Fl
       ## sample reg coeffs
       innerV = Aeig[3] * inv(Diagonal(τ_A[k].*Aeig[2])+I) * Aeig[1]';
       Vβ = X*innerV*X' + I/τ_β;
-      β[:,k] = Vβ \ (X*resid) + sqrt(σ2_η[k]).*chol(Hermitian(Vβ)) \ randn(p);
+      β[:,k] = Vβ \ (X*resid) + sqrt(σ2_η[k]).*(chol(Hermitian(Vβ)) \ randn(p));
 
       resid .-= X'β[:,k];
 
@@ -166,6 +180,18 @@ function makecov(XtX::Array{Float64,2},A::Array{Float64,2},σ2::Float64,
     end
   end
 
+  return inv(V)
+end
+
+function precisionsum(a::Float64,B::Tuple{Float64,Union{UniformScaling,Array{Float64,2}}}...)
+  n = size(B[2])[1];
+  V = Array{Float64,2}(n,n);
+  for i in 1:n
+    for j in 1:n
+      V[i,j] = a;
+      for k in 1:length(B) V[i,j] += B[k][1]*B[k][2][i,j]; end
+    end
+  end
   return inv(V)
 end
 
