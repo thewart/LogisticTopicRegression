@@ -1,4 +1,4 @@
-function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
+function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Float64,2},pss0::VectorPosterior,K::Int,
                            hy::Dict{Symbol,Float64}=hyperparameter();
                            zinit::Vector{Vector{Int64}}=Vector{Vector{Int64}}(),
                            iter::Int=1000,thin::Int=1,report_loglik::Bool=false)
@@ -13,8 +13,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   σ0_σ2η = hy[:σ0_σ2η];
   τ0_τ = hy[:τ0_τ];
   ν0_τ = hy[:ν0_τ];
-  τ0_β = hy[:τ0_β];
-  ν0_β = hy[:ν0_β]
+  τ0_u = hy[:τ0_u];
+  ν0_u = hy[:ν0_u];
+  τ_β = hy[:τ_β];
 
   #K0 = rand(round(Int64,K/2):K);
   topic = Vector{VectorPosterior}(K);
@@ -32,6 +33,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   for i in 1:n
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
+  ZtZ = Z'Z;
   XtX = X'X;
 
   σ2_η = rand(K)*2;
@@ -39,8 +41,8 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   η = randn(K,n)*2;
   μ_η = Array{Float64}(K);
   w = Array{Float64}(n);
-  β = Array{Float64}(p,K);
-  τ_β = exp(randn(K));
+  u = Array{Float64}(n,K);
+  τ_u = exp(randn(K));
 
   saveiter = thin:thin:iter;
   nsave = length(saveiter);
@@ -54,10 +56,10 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   post[:τ] = Vector{Float64}(nsave);
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
-  post[:β] = Array{Float64}(p,K,nsave);
+  post[:u] = Array{Float64}(n,K,nsave);
   if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   post[:hyperparameter] = hy;
-  post[:τ_β] = Array{Float64,2}(K,nsave);
+  post[:τ_u] = Array{Float64,2}(K,nsave);
 
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
@@ -87,7 +89,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
 
     for k in 1:K
       ## sample η and λ
-      iΣ = makecov(XtX,τ_μ,τ_β[k]);
+      iΣ = makecov(XtX,ZtZ,τ_β,τ_u[k],τ_μ);
       iΣ_k = iΣ./σ2_η[k];
       for i in 1:n
         c = logsumexp(η[setdiff(1:K,k),i]);
@@ -96,11 +98,6 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
         w[i] = nk[k,i] - nd[i]/2 + c*λ;
         iΣ_k[i,i] += λ;
       end
-
-      Lβ = inv( chol(X*X' + diagm(fill(1/τ_β[k],p)) ));
-      ΣβX = Lβ*Lβ'*X;
-      invaddIτXtX = inv(I+τ_β[k]*XtX);
-      suminvaddIτXtX = sum(invaddIτXtX);
 
       ηk = iΣ_k \ w + chol(Hermitian(iΣ_k)) \ randn(n);
       η[k,:] = ηk;
@@ -111,17 +108,20 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
-      σ2hat = σ2_η[k]/(1/τ_μ + suminvaddIτXtX);
-      μhat = σ2hat/σ2_η[k]*sum(invaddIτXtX*η[k,:]);
-      #σ2hat = inv(1/(τ_μ*σ2_η[k]) + n/σ2_η[k]);
-      #μhat = σ2hat*sum(η[k,:])/σ2_η[k];
+      Vμ = inv(I+τ_u[k]*ZtZ + τ_β*XtX);
+      σ2hat = σ2_η[k]/(1/τ_μ + sum(Vμ));
+      μhat = σ2hat/σ2_η[k]*sum(Vμ*η[k,:]);
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
 
-      β[:,k] = ΣβX*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
+      resid = (η[k,:] .- μ_η[k]);
 
-      a = 0.5(p+ν0_β);
-      b = 0.5(τ0_β*ν0_β + dot(β[:,k],β[:,k])/σ2_η[k]);
-      τ_β[k] = rand(InverseGamma(a,b));
+      innerV = inv(XtX*τ_β + I);
+      Lu = inv( chol(Hermitian(Z*innerV*Z' + I*inv(τ_u[k]))));
+      u[:,k] = Lu*Lu'*Z*innerV*resid + sqrt(σ2_η[k]).*Lu*randn(n);
+
+      a = 0.5(n+ν0_u);
+      b = 0.5(τ0_u*ν0_u + dot(u[:,k],u[:,k])/σ2_η[k]);
+      τ_u[k] = rand(InverseGamma(a,b));
 
     end
     ## sample variance of means
@@ -140,19 +140,13 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
           post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
         end
       end
-      #for k in 1:K
-        #post[:β][:,k,j] = ΣβX*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
-        #  post[:lpθ][j] += logpdf(MvNormalCanon(iΣ./σ2_η[k]),η[k,:])[1] +
-        #                  logpdf(σ2prior,σ2_η[k]);
-      #end
-      #post[:lpθ][j] += logpdf(τprior,τ_μ);
-      post[:β][:,:,j] = β;
+      post[:u][:,:,j] = u;
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
       post[:μ][:,j] = μ_η;
       post[:σ2][:,j] = σ2_η;
       post[:τ][j] = τ_μ;
-      post[:τ_β][:,j] = τ_β;
+      post[:τ_u][:,j] = τ_u;
     end
 
   end
@@ -160,12 +154,14 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   return post
 end
 
-function makecov(XtX::Array{Float64,2},τ::Float64,τ_β::Float64)
+function makecov(XtX::Array{Float64,2},ZtZ::Array{Float64,2},
+  τ_β::Float64,τ_u::Float64,τ_μ::Float64)
+
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
   for i in 1:n
     for j in 1:n
-      V[j,i] = XtX[j,i].*τ_β + (i==j ? 1+τ : τ);
+      V[j,i] = XtX[j,i].*τ_β + ZtZ[j,i].*τ_u + (i==j ? 1+τ_μ : τ_μ);
     end
   end
 
@@ -185,9 +181,9 @@ function precisionsum(a::Float64,B::Tuple{Float64,Union{UniformScaling,Array{Flo
 end
 
 function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
-  τ0_τ = 0.25,ν0_τ = 1.0,τ0_β = 1.0,ν0_β=0.1)
+  τ0_τ = 0.25,ν0_τ = 1.0,τ0_u = 0.25,ν0_u=1.0,τ_β=1.0)
   return Dict(:ν0_σ2η => ν0_σ2η, :σ0_σ2η => σ0_σ2η, :τ0_τ => τ0_τ,
-  :ν0_τ => ν0_τ, :τ0_β => τ0_β, :ν0_β => ν0_β)
+  :ν0_τ => ν0_τ, :τ0_u => τ0_u, :ν0_u => ν0_u, :τ_β => τ_β)
 end
 
 function refβ(β::Array{Float64,2},refk::Int64)
