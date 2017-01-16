@@ -36,6 +36,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
   ZtZ = Z'Z;
   XtX = X'X;
 
+  Lβ = inv( chol( X*X' + I*inv(τ_β)));
+  ΣβX = Lβ*Lβ'*X;
+
   σ2_η = rand(K)*2;
   τ_μ = rand()*2;
   η = randn(K,n)*2;
@@ -43,6 +46,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
   w = Array{Float64}(n);
   u = Array{Float64}(n,K);
   τ_u = exp(randn(K));
+  β = Array{Float64,2}(p,K);
 
   saveiter = thin:thin:iter;
   nsave = length(saveiter);
@@ -60,6 +64,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
   if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   post[:hyperparameter] = hy;
   post[:τ_u] = Array{Float64,2}(K,nsave);
+  post[:β] = Array{Float64}(p,K,nsave);
 
   logpost = Array{Float64}(K);
   π = Array{Float64}(K);
@@ -108,7 +113,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
-      Vμ = inv(I+τ_u[k]*ZtZ + τ_β*XtX);
+      Vμ = inv(τ_u[k]*ZtZ + τ_β*XtX + I);
       σ2hat = σ2_η[k]/(1/τ_μ + sum(Vμ));
       μhat = σ2hat/σ2_η[k]*sum(Vμ*η[k,:]);
       μ_η[k] = randn()*sqrt(σ2hat) + μhat;
@@ -123,6 +128,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
       b = 0.5(τ0_u*ν0_u + dot(u[:,k],u[:,k])/σ2_η[k]);
       τ_u[k] = rand(InverseGamma(a,b));
 
+      resid .-= Z'u[:,k];
+      β[:,k] = ΣβX*resid + sqrt(σ2_η[k]).*Lβ*randn(p);
+
     end
     ## sample variance of means
     a = 0.5(K+ν0_τ);
@@ -136,10 +144,11 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
       j = findin(saveiter,t)[1];
       for i in 1:n
         post[:z][i][:,j] = z[i];
-        if report_loglik
-          post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
-        end
+        #if report_loglik
+        #  post[:loglik][i,j] = sum(lppd(y[i],topic,softmax(η[:,i])));
+        #end
       end
+      post[:β][:,:,j] = β;
       post[:u][:,:,j] = u;
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
@@ -193,17 +202,17 @@ refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk:refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
 
-function writefit(fit::Dict{Symbol,AbstractArray},path::String)
+function writefit(fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},path::String)
   if !isdir(path) mkpath(path); end
   n = length(fit[:z]);
   K,nsave = size(fit[:topic]);
   p = size(fit[:β])[1];
     b = length(fit[:topic][1]);
   writecsv(string(path,"dims.csv"),[n,K,p,b,nsave]);
-  writecsv(string(path,"sigma.csv"),hcat(fit[:τ],fit[:σ2]'));
+  writecsv(string(path,"sigma.csv"),hcat(fit[:τ],fit[:σ2]',fit[:τ_u]'));
   writecsv(string(path,"beta.csv"),fit[:β][:]);
   writecsv(string(path,"eta.csv"),fit[:η][:]);
-  writecsv(string(path,"loglik.csv"),fit[:loglik]');
+  #writecsv(string(path,"loglik.csv"),fit[:loglik]');
   writecsv(string(path,"mu.csv"),fit[:μ]');
   writecsv(string(path,"z.csv"),vcat(fit[:z]...));
   writecsv(string(path,"nd.csv"),map(x -> size(x)[1],fit[:z]));
