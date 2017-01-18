@@ -184,7 +184,7 @@ refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk:refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
 
-function writefit(fit::Dict{Symbol,AbstractArray},path::String)
+function writefit(fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},path::String)
   if !isdir(path) mkpath(path); end
   n = length(fit[:z]);
   K,nsave = size(fit[:topic]);
@@ -194,10 +194,13 @@ function writefit(fit::Dict{Symbol,AbstractArray},path::String)
   writecsv(string(path,"sigma.csv"),hcat(fit[:τ],fit[:σ2]'));
   writecsv(string(path,"beta.csv"),fit[:β][:]);
   writecsv(string(path,"eta.csv"),fit[:η][:]);
-  writecsv(string(path,"loglik.csv"),fit[:loglik]');
+  #writecsv(string(path,"loglik.csv"),fit[:loglik]');
   writecsv(string(path,"mu.csv"),fit[:μ]');
   writecsv(string(path,"z.csv"),vcat(fit[:z]...));
   writecsv(string(path,"nd.csv"),map(x -> size(x)[1],fit[:z]));
   writecsv(string(path,"topicmean.csv"),
             mapreduce(y -> mean(topicppd(y)),vcat,fit[:topic]));
+  writecsv(string(path,"topicvar.csv"),
+            mapreduce(x -> map(var,topicppd(x)),vcat,fit[:topic]));
+
 end

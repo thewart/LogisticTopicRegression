@@ -69,11 +69,12 @@ statprep <- function(stat,dat,maxsec=630,nsec=NA,ctmc=F) {
   sdat <- dat[Behavior %in% stat,.(Observation,FocalID,Behavior,RelativeEventTime,Duration)]
   sdat <- sdat[RelativeEventTime<maxsec]
   zilch <- dat[!(Observation %in% sdat$Observation),unique(Observation)]
-  sdat <- sdat[,if ((length(Behavior)>1) & (RelativeEventTime[2] - RelativeEventTime[1]) < 2.6)
+  sdat <- sdat[,if ((length(Behavior)>1) & (RelativeEventTime[2] - RelativeEventTime[1]) < 5)
     .(Behavior[-1],RelativeEventTime[-1],Duration[-1])
     else .(Behavior,RelativeEventTime,Duration),by=c("Observation")]
   
   if (!ctmc) {
+    #truncate overtime states
     sdat[,V3:=pmin(V3,maxsec-V2)]
     if (!is.na(nsec))
       sdat <- sdat[,.(time=sum(round(V3/nsec))),by=c("Observation","V1")]
@@ -100,9 +101,9 @@ statprep <- function(stat,dat,maxsec=630,nsec=NA,ctmc=F) {
   return(out)
 }
 
-countprep <- function(behav,dat) {
-  
-  pt <- dat[,length(EventName),by=c("Observation","Behavior")]
+countprep <- function(behav,dat,adultsonly=T) {
+  underage <- c("HUMAN","INFANT","JUVENILE","NO ANIMAL","UNKNOWN")
+  pt <- dat[!(PartnerID %in% underage),length(EventName),by=c("Observation","Behavior")]
   pt <- dcast(pt,Observation ~ Behavior,fill=0)
   pt <- pt[,c(1,sapply(names(pt),function(x) str_detect(x,pattern = behav) %>% any) %>% which),with=F]
   setcolorder(pt,c("Observation",eventslices(names(pt),behav)))
@@ -131,7 +132,7 @@ eventsplit <- function(behav,ptetho,modifier,n) {
   }
 }
                              
-collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA)
+collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group)
 {
   if (is.null(stetho))
     stetho <- defaultstate()
@@ -143,6 +144,8 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA)
   for (i in 1:length(files)) {
     bdat[[i]] <- fread(files[i])
     bdat[[i]] <- copy(bdat[[i]][!overtime & !BadObs])
+    bdat[[i]] <- bdat[[i]][FocalID %in% bdat[[i]][,length(unique(Observation)),by=FocalID][V1>10,FocalID]]
+    bdat[[i]]$Group <- group[i]
   }
   bdat <- do.call(rbind,bdat)
   
@@ -163,8 +166,14 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA)
   
   X <- merge(Xc,Xs) %>% merge(Xp)
   l <- length(X)
-  X <- merge(X,unique(bdat[,cbind(Observation,FocalID,Observer,Year)]),by="Observation")
-  setcolorder(X,c(1,(l+1):(l+3),2:l))
+  X <- merge(X,unique(bdat[,cbind(Observation,FocalID,Observer,Year,Group)]),by="Observation")
+  setcolorder(X,c(1,(l+1):(l+4),2:l))
   setkey(X,"FocalID")
   return(X)
+}
+
+trimstatebegins <- function(dat,cutoff=10) { #remove first *cutoff* seconds of state behaviors, since they start at defaults
+  dat <- dat[!( (RelativeEventTime==0) & (Duration > 0) &  ((Duration+RelativeEventTime) < cutoff ))]
+  dat[(Duration>0) & (RelativeEventTime<cutoff), Duration:=Duration-(cutoff-RelativeEventTime)]
+  #dat <- dat[!(Duration>0 & (RelativeEventTime+Duration)<10)]
 }
