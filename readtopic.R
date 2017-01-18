@@ -1,4 +1,4 @@
-path <- "/home/seth/analysis/logtopreg/fitFKKR/"
+path <- "/home/seth/analysis/logtopreg/fitFKKR_forpaper/"
 d <- scan(paste0(path,"dims.csv")) %>% as.list
 names(d) <- c("n","K","p","b","nsave")
 etho <- rbind(ptetho[,c(1,3),with=F],stetho[,c(1,4),with=F])
@@ -32,7 +32,7 @@ ggplot(merge(etasumm,Xdf,by="FocalID"),aes(x=topic,y=prob)) + geom_boxplot() +
   ylab("Probability") + xlab("Behavioral state") + theme_light() + scale_y_continuous(limits = c(0,0.625),expand = c(0,0))
 
 #topic weights against covariates
-ggplot(merge(etasumm[topic=="S2"],Xdf,by="FocalID"),aes(y=prob,x=age,color=sex)) + 
+ggplot(merge(etasumm[topic=="S5"],Xdf,by="FocalID"),aes(y=prob,x=rank,color=sex)) + 
   geom_point() + geom_smooth(method="lm",formula=y ~ poly(x,2),level=0.999) +
   xlab("Age") + ylab("State 3 Probability") + theme_light() + scale_color_discrete(labels=c("Female","Male"),guide=guide_legend(title=""))
 
@@ -43,13 +43,17 @@ ggplot(etamu,aes(x=topic,y=prob)) + geom_point() + geom_errorbar(ymin=prob-std,y
 
 
 #topic contents
-topic <- data.table(behav=names(Y)[-(1:4)], #see bottom for renamed behaviors
+topic <- data.table(behav=names(Y)[-(1:5)], #see bottom for renamed behaviors
                     topic=rep(topicord_eta,rep(d$b,d$K)),
                     iter=rep(1:d$nsave,rep(d$K*d$b,d$nsave)),
-                    value=scan(paste0(path,"topicmean.csv")))
+                    value=scan(paste0(path,"topicmean.csv")),
+                    std=scan(paste0(path,"topicvar.csv"))%>%sqrt)
 topic[,type:=etho[str_detect(.BY[[1]],paste0("^",etho$behavior)),type],by=behav]
 topic[,behav:=behname]
 topic[,type:=factor(type)]
+
+#topic zscores
+topicz <- topic[iter>100,.(topic,value=(value-mean(value))/sd(value)),by=.(iter,type,behav)]
 
 topicmeans <- topic[iter>100,.(value=mean(value)),by=.(behav,topic)] %>% 
   dcast(topic ~ behav) %>% 
@@ -57,7 +61,7 @@ topicmeans <- topic[iter>100,.(value=mean(value)),by=.(behav,topic)] %>%
 
 #visualize entire topics
 topicsummary <- topic[iter > 100 & topic %in% nzmu$topic,
-                      .(value=mean(value)),by=.(topic,type,behav)] %>% .[value > 1.075,.(topic,type,value=(value-1)/max(value-1)),by=behav]
+                      .(value=mean(value)),by=.(topic,type,behav)] %>% .[value > 1.05,.(topic,type,value=(value-1)/max(value-1)),by=behav]
 #remove redundantish behaviors to declutter
 topicsummary <- topicsummary[!str_detect(behav,"^Groom[PET]")]
 
@@ -70,10 +74,21 @@ ggplot(topicsummary[topic %in% c("S10")],aes(y=value,x=topic,fill=type,label=beh
   scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + 
   ylab("Behavior (relative rate)") + xlab("") #save as 8x5
 ggplot(topicsummary[topic %in% c("S5")],aes(y=value,x=topic,fill=type,label=behav)) + geom_point() +
-  geom_label_repel(fontface="bold",size=4,force=3) + coord_cartesian(ylim = c(0,1)) + theme_classic() + 
-  scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + 
-  ylab("Behavior (relative rate)") + xlab("") #save as 7x5 
+  geom_label_repel() #fontface="bold",size=4,force=3) + coord_cartesian(ylim = c(0,1)) + theme_classic() + 
+  #scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + 
+  #ylab("Behavior (relative rate)") + xlab("") #save as 7x5 
 
+#behavior means/vars
+topic[iter>100 & str_detect(behav,"displace"),.(mean(value),quantile(value,0.01),quantile(value,0.99)),by=.(topic,behav)] %>%
+  ggplot(aes(x=topic,y=V1,color=behav)) + geom_point() + geom_errorbar(aes(ymin=V2,ymax=V3),width=0)
+topic[iter>100 & behav=="ScanProx",.(mean(std),quantile(std,0.01),quantile(std,0.99)),by=.(topic,behav)] %>%
+  ggplot(aes(x=topic,y=V1)) + geom_point() + geom_errorbar(aes(ymin=V2,ymax=V3),width=0)
+topic[iter>100 & behav=="ScanProxInd",.(mean(value),mean(std)),by=.(topic,behav)] %>%
+  ggplot(aes(x=topic,y=V1)) + geom_point() + geom_errorbar(aes(ymin=V1-V2,ymax=V1+V2),width=0)
+
+topicz[iter>100,.(mean(value),quantile(value,0.01),quantile(value,0.99)),by=.(type,topic,behav)][
+  topic %in% c("S4","S5") & type=="Agonistic"] %>%
+  ggplot(aes(x=behav,y=V1,color=topic)) + geom_point() + geom_errorbar(aes(ymin=V2,ymax=V3),width=0)
 
 #heritability
 h2dat <- data.table(topic=rep(topicord_eta,rep(d$nsave,d$K)),

@@ -218,4 +218,7 @@ function writefit(fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},pa
   writecsv(string(path,"nd.csv"),map(x -> size(x)[1],fit[:z]));
   writecsv(string(path,"topicmean.csv"),
             mapreduce(y -> mean(topicppd(y)),vcat,fit[:topic]));
+  writecsv(string(path,"topicvar.csv"),
+            mapreduce(x -> map(var,topicppd(x)),vcat,fit[:topic]));
+
 end
