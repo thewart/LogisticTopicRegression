@@ -144,6 +144,7 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group)
   for (i in 1:length(files)) {
     bdat[[i]] <- fread(files[i])
     bdat[[i]] <- copy(bdat[[i]][!overtime & !BadObs])
+    bdat[[i]] <- bdat[[i]][FocalID %in% bdat[[i]][,length(unique(Observation)),by=FocalID][V1>10,FocalID]]
     bdat[[i]]$Group <- group[i]
   }
   bdat <- do.call(rbind,bdat)

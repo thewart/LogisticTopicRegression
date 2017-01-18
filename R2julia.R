@@ -9,7 +9,13 @@ ptetho <- defaultpoint2()[type!="misc" & !(behavior%in%c("Vigilnce","PsCnTerm","
 #ptetho <- c("AffVoc","Approach","FearGrm","Leave","Submit","Vigilnce","avoid","contactAgg","displace","noncontactAgg","threat")
 stetho <- defaultstate2()[type!="misc" & state!="Corral"]
 Y <- collectfocal(fpath,ptetho,stetho,group = c("F","F","HH","R"))
-Y <- Y[FocalID %in% Y[,length(Observation),by=FocalID][V1>10,FocalID]] 
+Y <- Y[FocalID %in% Y[,length(Observation),by=FocalID][V1>10,FocalID]]
+
+ncovcols <- 5
+
+#check for animals that switched groups and pick one group with more obs (so far it is always F)
+redund <- Y[,length(unique(Group)),by=FocalID][V1>1,FocalID]
+Y <- Y[!( (FocalID %in% redund) & (Group!="F"))]
 
 #remove behaviors that happen too infrequenlty and baseline state behaviors
 filt <- Y[,lapply(.SD,function(x) mean(x>0)),.SD=eventslices(names(Y),ptetho)] > 0.005
@@ -18,10 +24,10 @@ Y <- Y[,-filt,with=F]
 Yraw <- copy(Y)
 
 #discritize!!
-Y <- cbind(Y[,1:5],Y[,lapply(.SD,function(x) 
+Y <- cbind(Y[,1:ncovcols],Y[,lapply(.SD,function(x) 
   cut(x,c(0,quantile(x,c(0.01,0.2,0.4,0.6,0.8,0.99,1))+0.5) %>% unique,include.lowest = T)),
-  .SD=-(1:5)])
-Y <- cbind(Y[,1:5],Y[,lapply(.SD,as.numeric),.SD=-(1:5)])
+  .SD=-(1:ncovcols)])
+Y <- cbind(Y[,1:ncovcols],Y[,lapply(.SD,as.numeric),.SD=-(1:ncovcols)])
 
 #collect covariates
 library(xlsx)
