@@ -1,5 +1,6 @@
 library(gtools)
 library(rstan)
+readyparallel()
 topetho <- stan_model("~/code/topetho/categorical_topetho.stan")
 
 n <- 4000
@@ -29,11 +30,11 @@ moo <- optimizing(topetho,dat,verbose=T,init=init,as_vector=F)
 pm <- moo$value + nrow(moo$hessian)/2 * log(2*pi) - 0.5*(determinant(-moo$hessian,logarithm=T) %>% (function(x) c(x$sign*x$modulus)))
 
 
-foo3 <- foreach(1:18) %dopar% { library(gtools); library(rstan)
+foo3 <- foreach(1:102) %dopar% { library(gtools); library(rstan)
   init <- list(pi=rdirichlet(1,alpha = rep(1,dat$K)) %>% as.vector(),
                theta_raw=sapply(Y[,-(1:5),with=F],function(x) table(x) %>% prop.table) %>% unlist() %>% matrix(nrow=dat$K,ncol=sum(dat$Bs),byrow = T))
   #init$theta_raw <- init$theta_raw * pmax(1-rnorm(length(init$theta_raw),sd=0.5),0.01)
-  moo <- optimizing(topetho,dat,verbose=T,init=init,as_vector=F,iter=600)
+  moo <- optimizing(topetho,dat,verbose=T,init=init,as_vector=F,iter=400)
   return(moo)
 }
 
