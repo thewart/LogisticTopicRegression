@@ -212,6 +212,7 @@ function writefit(fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},pa
   writecsv(string(path,"sigma.csv"),hcat(fit[:τ],fit[:σ2]',fit[:τ_u]'));
   writecsv(string(path,"beta.csv"),fit[:β][:]);
   writecsv(string(path,"eta.csv"),fit[:η][:]);
+  writecsv(string(path,"u.csv"),fit[:u][:]);
   #writecsv(string(path,"loglik.csv"),fit[:loglik]');
   writecsv(string(path,"mu.csv"),fit[:μ]');
   writecsv(string(path,"z.csv"),vcat(fit[:z]...));
@@ -220,5 +221,11 @@ function writefit(fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},pa
             mapreduce(y -> mean(topicppd(y)),vcat,fit[:topic]));
   writecsv(string(path,"topicvar.csv"),
             mapreduce(x -> map(var,topicppd(x)),vcat,fit[:topic]));
-
+  θ = Vector{Float64}(0);
+  for i in 1:(length(fit[:topic]))
+      append!(θ,vcat(map(x -> params(x)[1],topicppd(fit[:topic][i]))...));
+  end
+  writecsv(string(path,"topicparams.csv"),θ);
+  writecsv(string(path,"paramlengths.csv"),
+  map(x -> length(params(x)[1]),topicppd(fit[:topic][1])));
 end
