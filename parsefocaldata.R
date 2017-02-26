@@ -132,7 +132,7 @@ eventsplit <- function(behav,ptetho,modifier,n) {
   }
 }
                              
-collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group)
+collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group,fixyear=T)
 {
   if (is.null(stetho))
     stetho <- defaultstate()
@@ -145,6 +145,8 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group)
     bdat[[i]] <- fread(files[i])
     bdat[[i]] <- copy(bdat[[i]][!overtime & !BadObs])
     bdat[[i]] <- bdat[[i]][FocalID %in% bdat[[i]][,length(unique(Observation)),by=FocalID][V1>10,FocalID]]
+    if (fixyear)
+      bdat[[i]]$Year <- bdat[[i]][,table(Year)] %>% which.max() %>% names()
     bdat[[i]]$Group <- group[i]
   }
   bdat <- do.call(rbind,bdat)
@@ -168,7 +170,7 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group)
   l <- length(X)
   X <- merge(X,unique(bdat[,cbind(Observation,FocalID,Observer,Year,Group)]),by="Observation")
   setcolorder(X,c(1,(l+1):(l+4),2:l))
-  setkey(X,"FocalID")
+  setkey(X,"FocalID","Year")
   return(X)
 }
 
