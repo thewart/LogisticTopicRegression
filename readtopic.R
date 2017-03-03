@@ -29,10 +29,10 @@ etamu[,topic:=topicord_eta]
 etasumm <- etadat[iter>100,.(prob=mean(prob),eta=mean(eta)),by=.(FocalID,topic)]
 etadat[,prob:=exp(eta)/sum(exp(eta)),by=.(FocalID,iter)]
 
-# udat <- data.table(FocalID=Xdf$FocalID,
-#                   topic=rep(topicord_eta,rep(d$n,d$K)),
-#                   iter=rep(1:d$nsave,rep(d$n*d$K,d$nsave)),
-#                   u=scan(paste0(path,"u.csv")))
+udat <- data.table(FocalID=Xdf$FocalID,
+                  topic=rep(topicord_eta,rep(d$n,d$K)),
+                  iter=rep(1:d$nsave,rep(d$n*d$K,d$nsave)),
+                  u=scan(paste0(path,"u.csv")))
 
 
 #population topic weight probabilities
@@ -77,10 +77,10 @@ topicsummary <- topic[iter > 100 & topic %in% nzmu$topic,
 #remove redundantish behaviors to declutter
 #topicsummary <- topicsummary[!str_detect(behav,"^Groom[PET]")]
 
-ggplot(topicsummary[topic %in% paste0("S",1:5)],aes(y=value,x="",fill=type,label=behav)) + geom_point() +
-  geom_label_repel(fontface="bold",size=4) + coord_cartesian(ylim = c(0,1)) + theme_light() + 
-  scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + scale_y_continuous(minor_breaks = NULL) + 
-  ylab("Behavior (relative rate)") + facet_wrap(~topic,nrow=2) + xlab("")
+ggplot(topicsummary[topic %in% paste0("S",1:10),consolidate(behav,value,0.33),by=c("topic","type")],aes(y=value,x="",fill=type,label=behav)) + geom_point() +
+  geom_label_repel(fontface="bold",size=4,force = 12) + coord_cartesian(ylim = c(0,1)) + theme_light(base_size = 16) + 
+  scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + scale_y_continuous(name="Behavior (relative rate)",minor_breaks = NULL) + 
+  facet_wrap(~topic,nrow=2) + scale_x_discrete(name="",breaks=NULL)
 ggplot(topicsummary[topic %in% c("S10")],aes(y=value,x=topic,fill=type,label=behav)) + geom_point() +
   geom_label_repel(fontface="bold",size=4,force=5) + coord_cartesian(ylim = c(0,1)) + theme_classic() + 
   scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + 
@@ -120,7 +120,7 @@ ggplot(sigdat[iter>250 & topic!=bl,.(Heritability=median(h2),lb=quantile(h2,0.17
 
 #regression coefficients
 betadat <- data.table(topic=rep(topicord_eta,rep(d$p,d$K)),
-                   coeff=rep(colnames(X),d$K*d$nsave) %>% as.character(),
+                   coeff=rep(ordered(colnames(X),levels=colnames(X)),d$K*d$nsave),
                    iter=rep(1:d$nsave,rep(d$p*d$K,d$nsave)),
                    beta=scan(paste0(path,"beta.csv")))
 betadat[,beta:=beta-betadat[topic==bl,beta],by=topic]
@@ -135,8 +135,8 @@ ggplot(betadat[iter>250 & topic=="S10",
   geom_errorbarh(width=0) + geom_vline(xintercept = 0) + xlab("Regression coefficient for S10") + ylab("Covariate")
 ggplot(betadat[iter>250 & topic !=bl,.(mu=mean(beta),lb=quantile(beta,0.025),ub=quantile(beta,0.975)),by=.(coeff,topic)],
        aes(x=mu,y=coeff,xmin=lb,xmax=ub)) + geom_point() + facet_wrap(~topic) +
-  geom_errorbarh(height=0) + geom_vline(xintercept = 0) + xlab("Regression coefficient") + ylab("Covariate") + 
-  scale_x_continuous(minor_breaks = NULL)
+  geom_errorbarh(height=0) + geom_vline(xintercept = 0) + scale_y_discrete("Covariate",labels = coefname) + 
+  scale_x_continuous("Regression coefficient", minor_breaks = NULL)
 
 #plot predicted functions
 mudatref <- mudat[,.(iter,mu=mu-mudat[topic==bl,mu]),by=topic]
@@ -154,20 +154,40 @@ tpsimhat[,etahat:=etahat+mu]; tpsimhat[,mu:=NULL]
 tpsimhat[,prob:=exp(etahat)/sum(exp(etahat)),by=.(iter,ID)]
 tphatsumm <- tpsimhat[,.(rank=rank[1],sex=sex[1],mu=mean(prob),lb=quantile(prob,0.05),ub=quantile(prob,0.95)),by=.(ID,topic)]
 ggplot(tphatsumm,aes(x=rank,y=mu,color=sex)) + geom_line() + geom_ribbon(aes(ymin=lb,ymax=ub,fill=sex),alpha=0.25,linetype=0) +
-  facet_wrap(~topic,nrow = 2,scales = "free_y") + theme_light() + scale_x_continuous(name="Dominance Rank",minor_breaks = NULL) + scale_y_continuous(name="Probability",minor_breaks = NULL)
+  facet_wrap(~topic,nrow = 2,scales = "free_y") + theme_light() + scale_y_continuous(name="Probability",minor_breaks = NULL) +
+  scale_x_continuous(name="Dominance Rank",minor_breaks = NULL,breaks=1:3,labels=c("L","M","H"))
 
 
 #plot R2
-etadatref <- etadat[,.(FocalID,iter,eta=eta-etadat[topic==bl,eta],prob=prob),by=topic]
-tpdat2 <- merge(tpdat,mudatref)
-tpdat2[,tphat:=tphat+mu]
-tpdat2[,prob:=exp(tphat)/sum(exp(tphat)),by=.(iter,FocalID)]
-r2dat <- merge(tpdat2,etadatref,by = c("iter","topic","FocalID"))[,1-mean((eta-tphat)^2)/mean((eta-mu)^2),by=.(iter,topic)]
-ggplot(r2dat[iter>250 & topic!=bl,.(R2=median(V1),lb=quantile(V1,0.17),llb=quantile(V1,0.05),ub=quantile(V1,0.83),uub=quantile(V1,0.95)),by=topic],
+#etadatref <- etadat[,.(FocalID,iter,eta=eta-etadat[topic==bl,eta],prob=prob),by=topic]
+tpdat2 <- merge(tpdat,mudat[,-"prob"])
+
+xbdat <- copy(tpdat2)
+xbdat[,tphat:=tphat+mu]
+xbdat[,prob:=exp(tphat)/sum(exp(tphat)),by=.(iter,FocalID)]
+r2dat <- merge(xbdat[,-"mu"],etadat,by = c("iter","topic","FocalID"))
+
+r2sum <- r2dat[,.(r2=1-var(prob.y-prob.x)/var(prob.y)),by=c("iter","topic")]
+ggplot(r2sum[,.(R2=mean(r2),lb=quantile(r2,0.17),llb=quantile(r2,0.025),ub=quantile(r2,0.83),uub=quantile(r2,0.95)),by=topic],
        aes(y=R2,ymax=ub,ymin=lb,x=topic)) + geom_errorbar(width=0,size=2) + 
   geom_errorbar(aes(ymin=llb,ymax=uub),width=0,size=0.25) + xlab("Behavioral state") +
   geom_point(shape = 21, colour = "black", fill = "white", size = 2, stroke = 2) + 
-  theme_light() + theme(panel.grid.major.x = element_blank()) + geom_hline(yintercept = 0)
+  theme_light() + theme(panel.grid.major.x = element_blank()) + geom_hline(yintercept = 0) + ylab(expression(R^2))
+
+h2dat <- merge(tpdat2,udat,by=c("iter","topic","FocalID"))
+h2dat[,tphat:=tphat+mu]
+h2dat[,probxb:=exp(tphat)/sum(exp(tphat)),.(iter,FocalID)]
+h2dat[,tphat:=tphat+u]
+h2dat[,probxbu:=exp(tphat)/sum(exp(tphat)),.(iter,FocalID)]
+r2dat <- merge(h2dat[,-c("mu","u")],etadat,by = c("iter","topic","FocalID"))
+
+r2sum <- r2dat[,.(r2xbu=1-var(prob-probxbu)/var(prob),r2xb=1-var(prob-probxb)/var(prob)),by=c("iter","topic")]
+r2sum <- melt(r2sum,measure.vars = c(3,4),value.name = "r2")
+ggplot(r2sum[,.(R2=mean(r2),lb=quantile(r2,0.17),llb=quantile(r2,0.025),ub=quantile(r2,0.83),uub=quantile(r2,0.95)),by=.(variable,topic)],
+       aes(y=R2,ymax=ub,ymin=lb,x=topic,color=variable)) + geom_errorbar(width=0,size=2,position= position_dodge(0.4)) + 
+  geom_errorbar(aes(ymin=llb,ymax=uub),width=0,size=0.25,position= position_dodge(0.4)) + xlab("Behavioral state") +
+  geom_point(shape = 21, fill = "white", size = 2, stroke = 2, position= position_dodge(0.4)) + 
+  theme_light() + theme(panel.grid.major.x = element_blank()) + geom_hline(yintercept = 0) + ylab(expression(R^2))
 
 #demonstrate an interaction effect
 ggplot(Yraw[Vigilnce<median(Vigilnce)],aes(x=`Approach:initiate(focal)`,y=`threat:direct'n(give)`)) + geom_jitter() + geom_smooth(method="lm",formula=y~x)
@@ -180,8 +200,8 @@ interdemo <- copy(interdemo_raw)
 interdemo[,threat:=cut(threat,c(0,1,2,3,6)-0.5,ordered_result = T)]
 interdemo[,Vigilnce:=findInterval(Vigilnce,quantile(Vigilnce,c(0.33,0.66))) %>% ordered(.,0:2)]
 idplt <- interdemo[,.(mu=mean(approach),sde=sqrt(var(approach)/length(approach))),by=.(Vigilnce,threat)]
-ggplot(idplt,aes(x=threat,y=mu,color=Vigilnce)) + geom_point(position = position_dodge(0.2)) + 
-  geom_errorbar(aes(ymin=mu-sde,ymax=mu+sde),width=0,position = position_dodge(0.2)) + theme_light() +
+ggplot(idplt,aes(x=threat,y=mu,color=Vigilnce)) + geom_point(position = position_dodge(0.4)) + 
+  geom_errorbar(aes(ymin=mu-sde,ymax=mu+sde),width=0,position = position_dodge(0.4)) + theme_light() +
   geom_smooth(data=interdemo,aes(x=as.numeric(threat),y=approach,color=Vigilnce),method="lm",formula = y~x,se=F) + 
   ylab("Approach") + xlab("Threat") + scale_color_discrete(labels=c("low","medium","high")) + scale_x_discrete(labels=c("0","1","2",">2"))
 
@@ -231,4 +251,41 @@ behname <- c("Scratch",
              "PassiveContact",
              "SocialProximity",
              "ProximityGroupSize")
+
+coefname <- c("Group HH","Group R","Male","Age",expression(Age^2),"Rank",expression(Rank^2),"Male x Age",expression("Male x "*Age^2),"Male x Rank",expression("Male x "*Rank^2))
              
+consolidate <- function(behav,value,thresh=0.2)
+{
+  distect <- str_detect(behav,"displace")
+  if (any(distect)) {
+    disb <- behav[distect]
+    behav <- behav[!distect]
+    disv <- value[distect]
+    value <- value[!distect]
+  }
+  
+  for (i in 1:length(behav))
+  {
+    stem <- str_split(behav[i],"[\\(\\)]",simplify = T)
+    if ( (length(stem) == 1)) next
+    
+    bi <- str_detect(behav,paste0("^",stem[1],"\\(")) %>% which()
+    if (length(bi)==1) next
+    
+    if (length(bi)>2) browser()
+    
+    if (abs(diff(value[bi])) < thresh) {
+      value[i] <- mean(value[bi])
+      value <- value[-bi[2]]
+      behav[i] <- paste0(stem[1],"(give/rec)")
+      behav <- behav[-bi[2]]
+    }
+  }
+  
+  if (any(distect)) {
+    value <- c(value,disv)
+    behav <- c(behav,disb)
+  }
+  return(list(value=value,behav=behav))
+  
+}
