@@ -21,15 +21,22 @@ etadat <- data.table(FocalID=Xdf$FocalID %>% rep(.,rep(d$K,d$n)),
                      topic=topicord,
                      iter=rep(1:d$nsave,rep(d$n*d$K,d$nsave)),
                      eta=scan(paste0(path,"eta.csv")))
-etadat[,prob:=exp(eta)/sum(exp(eta)),by=.(FocalID,iter)]
+etadat[,prob:=exp(eta)/sum(exp(eta)),by=.(FocalID,year,iter)]
 etamu <- etadat[iter>100,.(prob=mean(prob),std=sd(prob)),by=.(iter,topic)][,.(prob=mean(prob),std=mean(std)),by=topic]
 topicord_eta <- etamu[,rank(-prob)] %>% ordered()
 levels(topicord_eta) <- paste0("S",levels(topicord_eta))
 etadat[,topic:=topicord_eta]
 etamu[,topic:=topicord_eta]
-etasumm <- etadat[iter>100,.(prob=mean(prob),eta=mean(eta)),by=.(FocalID,topic)]
-etadat[,prob:=exp(eta)/sum(exp(eta)),by=.(FocalID,iter)]
+etasumm <- etadat[iter>100,.(prob=mean(prob),eta=mean(eta)),by=.(FocalID,year,topic)]
 
+etarep <- etadat[FocalID %in% Xdf[,names(table(FocalID))[table(FocalID)==2]]] %>% dcast(iter+FocalID + topic ~ year)
+repdat <- etarep[iter>100,cor(`2012`,`2013`),by=.(iter,topic)]
+
+pltrep <- etarep[iter>100,.(mean(`2012`),mean(`2013`)),by=.(topic,FocalID)]
+ggplot(pltrep,aes(x=V1,y=V2)) + geom_point() + geom_abline(slope=1) + 
+  scale_x_continuous("2012 phenotype",breaks = pretty_breaks(n=3),minor_breaks = NULL) + 
+  scale_y_continuous("2013 phenotype",breaks = pretty_breaks(n=3),minor_breaks = NULL) + 
+  facet_wrap(~topic,nrow=2,scales = "free") + theme_light()
 # udat <- data.table(FocalID=Xdf$FocalID,
 #                   topic=rep(topicord_eta,rep(d$n,d$K)),
 #                   iter=rep(1:d$nsave,rep(d$n*d$K,d$nsave)),
