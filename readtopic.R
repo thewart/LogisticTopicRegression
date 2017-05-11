@@ -123,7 +123,7 @@ betadat <- data.table(topic=rep(topicord_eta,rep(d$p,d$K)),
                    coeff=rep(ordered(colnames(X),levels=colnames(X)),d$K*d$nsave),
                    iter=rep(1:d$nsave,rep(d$p*d$K,d$nsave)),
                    beta=scan(paste0(path,"beta.csv")))
-betadat[,beta:=beta-betadat[topic==bl,beta],by=topic]
+#betadat[,beta:=beta-betadat[topic==bl,beta],by=topic]
 #plot means and cis 
 ggplot(betadat[iter>250 & topic %in% nzmu$topic,
             .(mu=mean(beta),lb=quantile(beta,0.025),ub=quantile(beta,0.975)),by=.(coeff,topic)],
@@ -139,7 +139,7 @@ ggplot(betadat[iter>250 & topic !=bl,.(mu=mean(beta),lb=quantile(beta,0.025),ub=
   scale_x_continuous("Regression coefficient", minor_breaks = NULL)
 
 #plot predicted functions
-mudatref <- mudat[,.(iter,mu=mu-mudat[topic==bl,mu]),by=topic]
+#mudatref <- mudat[,.(iter,mu=mu-mudat[topic==bl,mu]),by=topic]
 
 mar <- Xdf[sex=="m",range(rank)]
 far <- Xdf[sex=="f",range(rank)]
@@ -149,14 +149,14 @@ simdf <- data.table(sex=rep(c("f","m"),c(200,200)),
 tpdat <- betadat[iter>100,.(FocalID=Xdf$FocalID,tphat=as.vector(X %*% beta)),by=.(iter,topic)]
 tpsimhat <- tpdat[,.(ID=1:400,rank=simdf$rank,sex=simdf$sex,etahat=lm(tphat ~ group +sex*poly(age,2) + sex*poly(rank,2),dat=cbind(Xdf,tphat)) %>% predict(newdata=simdf)),
       ,by=.(iter,topic)]
-tpsimhat <- merge(tpsimhat,mudatref)
+tpsimhat <- merge(tpsimhat,mudat)
 tpsimhat[,etahat:=etahat+mu]; tpsimhat[,mu:=NULL]
 tpsimhat[,prob:=exp(etahat)/sum(exp(etahat)),by=.(iter,ID)]
 tphatsumm <- tpsimhat[,.(rank=rank[1],sex=sex[1],mu=mean(prob),lb=quantile(prob,0.05),ub=quantile(prob,0.95)),by=.(ID,topic)]
 ggplot(tphatsumm,aes(x=rank,y=mu,color=sex)) + geom_line() + geom_ribbon(aes(ymin=lb,ymax=ub,fill=sex),alpha=0.25,linetype=0) +
   facet_wrap(~topic,nrow = 2,scales = "free_y") + theme_light() + scale_y_continuous(name="Probability",minor_breaks = NULL) +
-  scale_x_continuous(name="Dominance Rank",minor_breaks = NULL,breaks=1:3,labels=c("L","M","H"))
-
+  scale_x_continuous(name="Dominance Rank",minor_breaks = NULL,breaks=1:3,labels=c("L","M","H")) + 
+  scale_color_discrete("",labels=c("Female","Male")) + scale_fill_discrete("",labels=c("Female","Male"))
 
 #plot R2
 #etadatref <- etadat[,.(FocalID,iter,eta=eta-etadat[topic==bl,eta],prob=prob),by=topic]
@@ -186,8 +186,16 @@ r2sum <- melt(r2sum,measure.vars = c(3,4),value.name = "r2")
 ggplot(r2sum[,.(R2=mean(r2),lb=quantile(r2,0.17),llb=quantile(r2,0.025),ub=quantile(r2,0.83),uub=quantile(r2,0.95)),by=.(variable,topic)],
        aes(y=R2,ymax=ub,ymin=lb,x=topic,color=variable)) + geom_errorbar(width=0,size=2,position= position_dodge(0.4)) + 
   geom_errorbar(aes(ymin=llb,ymax=uub),width=0,size=0.25,position= position_dodge(0.4)) + xlab("Behavioral state") +
-  geom_point(shape = 21, fill = "white", size = 2, stroke = 2, position= position_dodge(0.4)) + 
-  theme_light() + theme(panel.grid.major.x = element_blank()) + geom_hline(yintercept = 0) + ylab(expression(R^2))
+  geom_point(shape = 21, fill = "white", size = 2, stroke = 2, position= position_dodge(0.4)) + ylab(expression(R^2)) +
+  theme_light() + scale_color_discrete("",labels=c("Covariates \nand genetics \n","Covariates only"))
+
+r2sum <- r2dat[,.(h2=1-var(prob-probxbu)/var(prob-probxb)),by=c("iter","topic")]
+ggplot(r2sum[,.(R2=mean(h2),lb=quantile(h2,0.17),llb=quantile(h2,0.025),ub=quantile(h2,0.83),uub=quantile(h2,0.95)),by=topic],
+       aes(y=R2,ymax=ub,ymin=lb,x=topic)) + geom_errorbar(width=0,size=2) + 
+  geom_errorbar(aes(ymin=llb,ymax=uub),width=0,size=0.25) + xlab("Behavioral state") +
+  geom_point(shape = 21, colour = "black", fill = "white", size = 2, stroke = 2) + 
+  theme_light() + theme(panel.grid.major.x = element_blank()) + geom_hline(yintercept = 0) + ylab(expression("Pseudo H"^2))
+
 
 #demonstrate an interaction effect
 ggplot(Yraw[Vigilnce<median(Vigilnce)],aes(x=`Approach:initiate(focal)`,y=`threat:direct'n(give)`)) + geom_jitter() + geom_smooth(method="lm",formula=y~x)
@@ -289,3 +297,27 @@ consolidate <- function(behav,value,thresh=0.2)
   return(list(value=value,behav=behav))
   
 }
+
+##sparse data demo
+ptetho$modifier <- NA
+Yfig <- collectfocal(fpath,ptetho,stetho,group = c("F","F","HH","R"))
+Yfig[,Groom:=GroomGIVE+GroomGET]
+Yfig <- Yfig[,-c(2:5,18:20,23:26)]
+setnames(Yfig,c("Observation",
+                "Scratch",
+                "SelfGroom",
+                "Threat",
+                "Avoid",
+                "Displace",
+                "FearGrimace",
+                "Submit",
+                "Noncontact Aggression",
+                "Contact Aggression",
+                "Approach",
+                "Leave",
+                "Affiliative Vocalization",
+                "Feed",
+                "Travel",
+                "Groom"))
+ggplot(melt(Yfig),aes(x=value)) + geom_histogram() + facet_wrap(~variable,scale="free",nrow=3) +
+  scale_x_continuous("Count or Duration",minor_breaks = NULL) + scale_y_continuous("# of Focal Observations",minor_breaks = NULL)
