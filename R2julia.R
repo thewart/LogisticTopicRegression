@@ -33,25 +33,30 @@ Y <- cbind(Y[,1:ncovcols],Y[,lapply(.SD,as.numeric),.SD=-(1:ncovcols)])
 library(xlsx)
 drank <- read.xlsx("~/Dropbox/Subjects_attributes, dominance, etc/Dominance Hierarchies/DOMINANCE_ALLSUBJECTS_LONGLIST.xlsx",1) %>% as.data.table()
 drank[,ID:=toupper(ID) %>% str_replace_all(.,"_","")]
+drank <- drank[YEAR %in% c("2012","2013","2014","2015")]
 drank[,ORD_RANK:=ordered(ORD_RANK,levels=c("L","M","H"))]
 drank <- drank[,.(rank=as.numeric(ORD_RANK) %>% mean()),by=ID]
 
-Xdf <- data.table(FocalID=Y$FocalID,sex=getsex(Y$FocalID),age=getage(Y$FocalID,Y$Year[1]),group=Y$Group)
+
+Xdf <- data.table(FocalID=Y$FocalID,sex=getsex(Y$FocalID),age=getage(Y$FocalID,Y$Year),group=Y$Group)
+Xdf[,age:=mean(unique(age)),by=FocalID]
 Xdf <- merge(Xdf,drank,by.x = "FocalID",by.y="ID")
 #generate covariate design matrix
+
+#pedigree!!!!
+load("~/Dropbox/Pedigree and Life-History Data/pedigreeKW2016.RData")
+mia <- Xdf[!(FocalID %in% bigped$id),FocalID]
+Xdf <- Xdf[!(FocalID %in% mia),]
+Y <- Y[!(FocalID %in% mia)]
+
 crushed <- do.call("paste0",Xdf)
 obsgroup <- lapply(crushed[!duplicated(Xdf)],function(x) crushed==x)
 Xdf <- unique(Xdf)
 #Xdf[group %in% c("BB","KK","S","V"),group:="O"]
-X <- model.matrix( ~ group + sex*poly(age,2) + sex*poly(rank,2),Xdf)[,-1]
+X <- model.matrix( ~ group +sex*poly(age,2) + sex*poly(rank,2),Xdf)[,-1]
+#+ group*poly(rank,2) + group*poly(age,2)
 X[,-(1:3)] <- apply(X[,-(1:3)],2,function(x) (x-mean(x))/sd(x))
 
-#pedigree!!!!
-# load("~/Dropbox/Pedigree and Life-History Data/pedigreeKW2016.RData")
-# mia <- Xdf[!(FocalID %in% bigped$id),FocalID]
-# X <- X[!(Xdf$FocalID %in% mia),]
-# Xdf <- Xdf[!(FocalID %in% mia),]
-# Y <- Y[!(FocalID %in% mia)]
-# A <- 2*kinship2::kinship(bigped$id,dadid=bigped$sire,momid=bigped$dam)
-# A <- A[match(Xdf$FocalID,rownames(A)),match(Xdf$FocalID,rownames(A))]
-# Z <- chol(A)
+A <- 2*kinship2::kinship(bigped$id,dadid=bigped$sire,momid=bigped$dam)
+A <- A[match(Xdf$FocalID,rownames(A)),match(Xdf$FocalID,rownames(A))]
+Z <- chol(A)
