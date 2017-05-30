@@ -5,6 +5,7 @@ using Distributions
 using StatsBase
 using StatsFuns
 using PolyaGamma
+using RCall
 import Base.length
 import Base.getindex
 import Base.rand
@@ -46,5 +47,6 @@ include("topicllm.jl");
 include("prediction.jl")
 include("llmhelpers.jl")
 include("llmsamplers.jl")
+include("simulation.jl")
 
 end

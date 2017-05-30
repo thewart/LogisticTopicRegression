@@ -1,11 +1,11 @@
-function sample_z!(z::Vector{Int64}},topic::Vector{VectorPosterior},nk::AbstractVector{Int64},
+function sample_z!{T<:Real}(z::Vector{Int64},topic::Vector{VectorPosterior},nk::AbstractVector{Int64},
   π::Vector{Float64},y::Array{T,2},K::Int64)
 
   logpost = Vector{Float64}(K);
   for j in 1:length(z)
     zj = z[j];
-    pullsample!(topic[zj],y[i][:,j]);
-    nk[zj,i] -= 1;
+    pullsample!(topic[zj],y[:,j]);
+    nk[zj] -= 1;
 
     for k in 1:K
       logpost[k] = log(π[k]) + lppd(y[:,j],topic[k]);
@@ -21,6 +21,7 @@ end
 function sample_η(η::Vector{Float64},ηp::Array{Float64,2},
   iΣ::Array{Float64,2},nd::Vector{Int64},nk::Vector{Int64})
   n = length(nd);
+  w = Vector{Float64}(n);
   for i in 1:n
     c = logsumexp(ηp[:,i]);
     ρ = η[i] - c;

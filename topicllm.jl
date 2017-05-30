@@ -180,7 +180,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
     ## sample η and λ
       iΣ_k = iΣ./σ2_η[k];
 
-      nk = sample_η(η[k,:],η[vcat(1:(k-1),(k+1):end),:],iΣ_k,nd,nk[k,:]);
+      ηk = sample_η(η[k,:],η[vcat(1:(k-1),(k+1):end),:],iΣ_k,nd,nk[k,:]);
       η[k,:] = ηk;
 
       σ2_η[k] = sample_variance(ηk,iΣ,ν0_σ2η,σ0_σ2η);
@@ -192,7 +192,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       β[:,k] = ΣβX*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
     end
 
-    τ_u = sample_variance(μ_η,σ2_η,ν0_τ,τ0_τ);
+    τ_u = sample_variance(μ_η./σ2_η,1.0,ν0_τ,τ0_τ);
     ## save samples
     if t ∈ saveiter
       j = findin(saveiter,t)[1];

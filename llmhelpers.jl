@@ -36,7 +36,6 @@ function init_post(n::Int64,nd::Vector{Int64},K::Int64,p::Int64,nsave::Int64,isu
   post[:topic] = Array{VectorPosterior,2}(K,nsave);
   post[:η] = Array{Float64}(K,n,nsave);
   post[:β] = Array{Float64}(p,K,nsave);
-  if report_loglik post[:loglik] = Array{Float64,2}(n,nsave); end
   return post
   if isu
     post[:u] = Array{Float64}(n,K,nsave);

@@ -21,6 +21,7 @@ function VectorPosterior(x::Union{PostPredSS,Int64}...)
   end
   VectorPosterior(pp)
 end
+VectorPosterior(pp::PostPredSS) = VectorPosterior([pp]);
 
 getindex(VP::VectorPosterior,i) = VP.PP[i];
 length(VP::VectorPosterior) = length(VP.PP);
