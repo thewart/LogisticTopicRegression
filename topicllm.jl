@@ -88,7 +88,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       ## sample variance
       a = 0.5(n+ν0_σ2η);
       #β = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ_ηk*η[k,:]')[1]);
-      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]*iΣ*η[k,:]')[1]);
+      b = 0.5(σ0_σ2η*ν0_σ2η + (η[k,:]'*iΣ*η[k,:])[1]);
       σ2_η[k] = rand(InverseGamma(a,b));
 
       ## sample mean
@@ -106,7 +106,7 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
       j = findin(saveiter,t)[1];
       for i in 1:n post[:z][i][:,j] = z[i]; end
       for k in 1:K
-        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k])' + sqrt(σ2_η[k]).*Lβ*randn(p);
+        post[:β][:,k,j] = Σβ*X*(η[k,:] .- μ_η[k]) + sqrt(σ2_η[k]).*Lβ*randn(p);
       end
       post[:topic][:,j] = deepcopy(topic);
       post[:η][:,:,j] = η;
