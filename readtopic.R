@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-path <- "/home/seth/analysis/logtopreg/fitFKKR_forpaper/"
-=======
 library(ggrepel)
 path <- "/home/seth/analysis/logtopreg/fitFKKR_A_fixed_2/"
->>>>>>> raneffcov
 d <- scan(paste0(path,"dims.csv")) %>% as.list
 names(d) <- c("n","K","p","b","nsave")
 etho <- rbind(ptetho[,c(1,3),with=F],stetho[,c(1,4),with=F])

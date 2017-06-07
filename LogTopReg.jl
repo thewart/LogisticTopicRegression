@@ -35,6 +35,8 @@ export
   getindex,
   rand,
   length,
+  sim_dat,
+  mlinit_dirichlet,
 
   #the whole point
   topiclmm
@@ -47,6 +49,5 @@ include("topicllm.jl");
 include("prediction.jl")
 include("llmhelpers.jl")
 include("llmsamplers.jl")
-include("simulation.jl")
 
 end

@@ -21,14 +21,6 @@ end
 getindex(VP::VectorPosterior,i) = VP.PP[i];
 length(VP::VectorPosterior) = length(VP.PP);
 
-function lppd{T<:Real}(pp::VectorPosterior,y::Vector{T})
-  out = 0.0;
-  for i in 1:length(pp)
-    out += lppd(pp[i],y[pp.span[i]]);
-  end
-  return out
-end
-
 function addsample!{T<:Real}(pp::VectorPosterior,ynew::Vector{T})
   for i in 1:length(pp) addsample!(pp[i],ynew[pp.span[i]]); end
 end

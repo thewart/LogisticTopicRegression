@@ -1,59 +1,55 @@
-function simulation(n::Int64=100,nd::Int64=50,K::Int64=5,d::Int64=10,l::Int64=3,p::Int64=1,
-  σ_μ::Float64=0.5,σ_η::Float64=0.25,σ_Θ::Float64=1.0,σ_β::Float64=0.0);
+using LogTopReg, StatsFuns, StatsBase
 
-  nd = repeat([nd],inner=[n]);
+σ_μ = 0.5;
+σ = 0.25;
+σ_θ = 1.0;
+σ_β = 0.0;
 
-  y = Vector{Array{Int64,2}}(n);
-  μ = randn(K)*σ_μ;
+p=1;
+n = 200;
+nd = 100;
+K = [5,10,20,40,80];
+d = 30;
+l = 3;
 
-  β = randn(K,p)*σ_β;
-  X = randn(p,n);
+pss0 = VectorPosterior(CategoricalPosterior(l),d);
+ns = 500;
+warmup = 100;
 
-  θ = rand(Normal(0,σ_θ),l,d,K);
-  θ = mapslices(softmax,θ,1)
-  η = Array{Float64}(K,n);
-  nk = Array{Int64}(K,n);
-  for i in 1:n
-    η[:,i] = randn(K).*σ .+ μ .+ β*X[:,i];
-    nk[:,i] = rand(Multinomial(nd[i],softmax(η[:,i])));
-    y[i] = Array{Int64,2}(d,0)
-    for k in 1:K
-      if nk[k,i] > 0
-        y[i] = hcat(y[i],hcat(map(j -> mapslices(x -> rand(Categorical(x)),θ[:,:,k],1)[:],1:nk[k,i])...));
-      end
+Θmse = Vector{Vector{Float64}}(length(K));
+pmse = Array{Float64,2}(n,length(K));
+Θr2 = Vector{Vector{Float64}}(length(K));
+pr2 = Array{Float64,2}(n,length(K));
+topiccor = Vector{Vector{Float64}}(length(K));
+
+for i in 1:length(K)
+  sim = sim_dat(n,nd,K[i],d,l,p,σ_μ,σ,σ_θ,σ_β);
+  z = mlinit_dirichlet(sim[:y],K[i],d,fill(l,d),10);
+  fit = topiclmm(sim[:y],sim[:X],pss0,K[i],hyperparameter(τ_β=1e-10),zinit=z,iter=ns);
+
+  θhat = zeros(size(sim[:Θ]));
+  for k = 1:K[i]
+    for t = (warmup+1):ns
+      θhat[:,:,k] += hcat(map(mean,topicpd(fit[:topic][k,t]))...);
     end
   end
+  θhat = θhat./ns;
 
-  Y = hcat(y...)';
-  @rput K d l Y
-  R"library(rstan)"
-  R"topetho <- stan_model('~/code/topetho/categorical_topetho.stan')";
-  R"dat <- list(Y=Y,n=nrow(Y),K=K,B=d,Bs=rep(l,d),alpha_p=1,alpha_t=1)";
-
-  runs = 10;
-  ll = Vector{Float64}(runs);
-  r = Vector{Array{Float64,2}}(runs);
-  @time for i in 1:runs
-    R"init <- list(pi=gtools::rdirichlet(1,alpha = rep(1,dat$K)) %>% as.vector(),theta_raw=apply(Y,2,function(x) table(x) %>% prop.table()))";
-    R"init$theta_raw <- init$theta_raw * pmax(1-rnorm(length(init$theta_raw),sd=0.5),0.01)";
-    R"optout <- optimizing(topetho,dat,verbose=F,iter=100)";
-    ll[i] = rcopy(R"optout$value");
-    r[i] = rcopy(R"optout$par[str_detect(names(optout$par),'^r\\[')] %>% matrix(nrow=dat$K,ncol=dat$n,byrow = T)")
+  topicord = Vector{Int64}(K[i]);
+  topiccor[i] = Vector{Float64}(K[i]);
+  for k in 1:K[i]
+    avail = setdiff(1:K[i],topicord[1:(k-1)]);
+    topiccor[i][k],topicord[k] = findmax(mapslices(x -> cor(vec(x),vec(θhat[:,:,k])),sim[:Θ][:,:,avail],(1,2)));
+    topicord[k] = avail[topicord[k]];
   end
 
-  maxr = r[findmax(ll)[2]];
+  Θmse[i] = mapslices(sumabs2,θhat-sim[:Θ][:,:,topicord],(1,2))[:]./(l*d);
+  Θr2[i] = 1-mapslices(sumabs2,θhat-sim[:Θ][:,:,topicord],(1,2))[:]./(mapslices(x->sumabs2(x-mean(x)),sim[:Θ][:,:,topicord],(1,2))[:]);
 
-  zflat = mapslices(x -> rand(Categorical(x)),maxr,1);
-  z = Vector{Vector{Int64}}(length(y));
-  nd = map(x -> size(x)[2],y);
-  guh = 1;
-  for i in 1:length(y)
-    z[i] = zflat[guh:(guh+nd[i]-1)];
-    guh += nd[i];
-  end
+  ηhat = mapslices(mean,fit[:η][:,:,(warmup+1):ns],3)[:,:,1];
+  phat = mapslices(softmax,ηhat,1);
+  pi = mapslices(softmax,sim[:η][topicord,:],1);
+  pmse[:,i] = mapslices(sumabs2,phat-pi,1)./n;
+  pr2[:,i] = 1-mapslices(sumabs2,phat-pi,1)./mapslices(x->sumabs2(x-mean(x)),pi,1);
 
-  pss0 = VectorPosterior(CategoricalPosterior(l),d);
-  @time fit = topiclmm(y,X,pss0,K,hyperparameter(τ_β=1e-10),zinit=z,iter=ns);
-
-  return fit, η, Θ
 end

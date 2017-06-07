@@ -34,7 +34,7 @@ end
 function lppd{T<:Real}(y::Vector{Array{T,2}},fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}})
 
   n = length(y);
-  m = size(η)[3];
+  m = size(fit[:η])[3];
   lp = Array{Float64,2}(n,m);
   for i in 1:n
     for j in 1:m
