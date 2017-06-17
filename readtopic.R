@@ -28,6 +28,8 @@ etadat[,topic:=topicord_eta]
 etamu[,topic:=topicord_eta]
 etasumm <- etadat[iter>100,.(prob=mean(prob),eta=mean(eta)),by=.(FocalID,topic)]
 etadat[,prob:=exp(eta)/sum(exp(eta)),by=.(FocalID,iter)]
+mudat[,topic:=rep(topicord_eta,rep(d$nsave,d$K))]
+
 
 udat <- data.table(FocalID=Xdf$FocalID,
                   topic=rep(topicord_eta,rep(d$n,d$K)),
@@ -69,15 +71,15 @@ topicz <- topic[iter>100,.(topic,value=(value-mean(value))/sd(value)),by=.(iter,
 
 topicmeans <- topic[iter>100,.(value=mean(value)),by=.(behav,topic)] %>% 
   dcast(topic ~ behav) %>% 
-  merge(nzmu[iter>100,.(prob=mean(prob)),by=topic],by="topic")
+  merge(mudat[iter>100,.(prob=mean(prob)),by=topic],by="topic")
 
 #visualize entire topics
 topicsummary <- topic[iter > 100 & topic %in% nzmu$topic,
-                      .(value=mean(value)),by=.(topic,type,behav)] %>% .[value > 1.05,.(topic,type,value=(value-1)/max(value-1)),by=behav]
+                      .(value=mean(value)),by=.(topic,type,behav)] %>% .[value > 1.075,.(topic,type,value=(value-1)/max(value-1)),by=behav]
 #remove redundantish behaviors to declutter
 #topicsummary <- topicsummary[!str_detect(behav,"^Groom[PET]")]
 
-ggplot(topicsummary[topic %in% paste0("S",1:10),consolidate(behav,value,0.33),by=c("topic","type")],aes(y=value,x="",fill=type,label=behav)) + geom_point() +
+ggplot(topicsummary[topic %in% paste0("S",1:6),consolidate(behav,value,0.33),by=c("topic","type")],aes(y=value,x="",fill=type,label=behav)) + geom_point() +
   geom_label_repel(fontface="bold",size=4,force = 12) + coord_cartesian(ylim = c(0,1)) + theme_light(base_size = 16) + 
   scale_fill_brewer(drop=F,palette = "Accent", guide=guide_legend(title="")) + scale_y_continuous(name="Behavior (relative rate)",minor_breaks = NULL) + 
   facet_wrap(~topic,nrow=2) + scale_x_discrete(name="",breaks=NULL)
