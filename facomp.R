@@ -44,6 +44,7 @@ reptopic$model <- "State model"
 repcomp <- rbind(reptopic[,-1],repscores[,-1],repscores2[,-1])
 repcomp[,se:=(1-V1)/sqrt(repid[,sum(V1==2)]-2)]
 repcomp$type <- "Repeatability"
+repcomp[,model:=ordered(model,levels=c("State model","Factor model 1","Factor model 2"))]
 ggplot(repcomp,aes(x=V1,fill=model)) + 
   geom_histogram(position="dodge",bins=10) + theme_classic() + xlab("Correlation between 2012 and 2013 phenoypes") + ylab("# of States/Factors") +
   scale_fill_discrete(name=NULL)
@@ -80,15 +81,16 @@ h2comp <- rbind(data.table(V1=sapply(h2samp,mean),
            se=sapply(h2samp,sd)),
            r2sum[,.(mean(h2),model="State model",se=sd(h2)),by=topic][,-1]) #from readtopic.R
 h2comp$type <- "Heritability"
+h2comp[,model:=ordered(model,levels=c("State model","Factor model 1","Factor model 2"))]
 
 p1 <- ggplot(repcomp,aes(y=V1,x=model)) +
   geom_pointrange(aes(ymin=V1-se,ymax=V1+se),position = position_jitter(width=0.2,height=0),size=0.33) +
-  ylab(expression(paste("Pearson's ", italic("r")))) + xlab("") + ggtitle("Repeatability") + 
+  ylab("Repeatability") + xlab("") + 
   theme_light() + theme(plot.title = element_text(hjust = 0.5,size=11))
 
 p2 <- ggplot(h2comp,aes(y=V1,x=model)) +
   geom_pointrange(aes(ymin=V1-se,ymax=V1+se),position = position_jitter(width=0.2,height=0),size=0.33) +
-  ylab(expression(paste(h^2))) + xlab("") + ggtitle("Heritability") + 
+  ylab("Heritability") + xlab("") + 
   theme_light() + theme(plot.title = element_text(hjust = 0.5,size=11))
 
 ##### simulate fa data
@@ -106,14 +108,14 @@ for (i in 1:length(Yrep_fa)) {
 names(Yrep_fa) <- behname
 Yrep_fa <- Yrep_fa[,.(Travel,Feed,`NonContactAgg(receive)`)]
 Yrep_fa[,`NonContactAgg(receive)`:=`NonContactAgg(receive)` > 1]
-Yrep_fa$Model <- "FA1"
+Yrep_fa$Model <- "Factor model 1"
 
 #get real data
 Ytmp <- Y[,-(1:ncovcols)]
 names(Ytmp) <- behname
 Ytmp <- Ytmp[,.(Travel,Feed,`NonContactAgg(receive)`)]
 Ytmp[,`NonContactAgg(receive)`:=`NonContactAgg(receive)` > 1]
-Ytmp$Model <- "Cayo data"
+Ytmp$Model <- "Cayo Santiago data set"
 
 #simulate topic model
 pl <- Y[,-(1:ncovcols)] %>% sapply(max)
@@ -145,10 +147,16 @@ Yrep_top[,`NonContactAgg(receive)`:=`NonContactAgg(receive)` > 1]
 setcolorder(Yrep_top,c(3,1,2))
 Yrep_top$Model <- "State model"
 repdat <- rbind(Yrep_top,Ytmp,Yrep_fa)[,.(Travel=mean(Travel),n=length(Travel),ste=2*sd(Travel)/sqrt(length(Travel))),by=.(Feed,`NonContactAgg(receive)`,Model)]
-repdat[Model!="Cayo data",ste:=0]
+repdat[Model!="Cayo Santiago data set",ste:=0]
 repdat[,Model:=ordered(Model,levels=unique(Model)[c(2,1,3)])]
 repdat[,`NonContactAgg(receive)`:=ordered(`NonContactAgg(receive)`,levels=c(T,F),labels=c("High","Low"))]
 repdat <- repdat[!(Feed==5 & `NonContactAgg(receive)`=="High")]
-ggplot(repdat,aes(x=Feed,y=Travel,color=`NonContactAgg(receive)`)) + geom_point(size=1,position=position_dodge(width=0.25)) +
+ptop <- ggplot(repdat,aes(x=Feed,y=Travel,color=`NonContactAgg(receive)`)) + geom_point(size=1,position=position_dodge(width=0.25)) +
   geom_line(position=position_dodge(width=0.25)) + geom_errorbar(aes(ymin=Travel-ste,ymax=Travel+ste),width=0,position=position_dodge(width=0.25)) +
-  facet_wrap(~Model,scale="free") + scale_x_continuous(minor_breaks = NULL) + scale_color_discrete(name="Aggression\nreceived")
+  facet_wrap(~Model,scale="free") + scale_x_continuous(minor_breaks = NULL) + scale_color_discrete(name="Aggression \nreceived") +
+  theme_light() + theme(legend.justification=c(1,0), legend.position=c(1,0),legend.box.background = element_rect())
+
+# make fancyplot
+library(cowplot)
+p12 <- plot_grid(p1,p2,labels = c("b","c"),scale=0.9)
+plot_grid(ptop,p12,nrow = 2,labels = c("a",""),rel_heights = c(1.0,0.9))
