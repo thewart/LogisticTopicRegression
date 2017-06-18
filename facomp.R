@@ -41,8 +41,12 @@ etasumm <- etadat[iter>100,.(prob=mean(prob),eta=mean(eta)),by=.(FocalID,year,to
 etarep <- etasumm[FocalID %in% repid[V1==2,FocalID]] %>% dcast(FocalID + topic ~ year,value.var="prob")
 reptopic <- etarep[,cor(`2012`,`2013`),by=.(topic)]
 reptopic$model <- "State model"
-
-ggplot(rbind(reptopic[,-1],repscores[,-1],repscores2[,-1]),aes(x=V1,fill=model)) + geom_histogram(position="dodge",bins=10) + theme_classic() + xlab("Correlation between 2012 and 2013 phenoypes") + ylab("# of States/Factors")
+repcomp <- rbind(reptopic[,-1],repscores[,-1],repscores2[,-1])
+repcomp[,se:=(1-V1)/sqrt(repid[,sum(V1==2)]-2)]
+repcomp$type <- "Repeatability"
+ggplot(repcomp,aes(x=V1,fill=model)) + 
+  geom_histogram(position="dodge",bins=10) + theme_classic() + xlab("Correlation between 2012 and 2013 phenoypes") + ylab("# of States/Factors") +
+  scale_fill_discrete(name=NULL)
 
 #### heritability
 library(rstan)
@@ -61,8 +65,6 @@ for (i in 1:10){
                        pars=c("alpha","beta","sigma_eps","sigma_g","h2"))
 }
 
-
-
 Y2 <- melt(Y[,-c(3,5)])[,mean(value),by=.(FocalID,variable)] %>% dcast(formula=FocalID~variable)
 fa2 <- factanal(Y2[,-(1)],factors = 10,scores = "regression",control=list(nstart=50,lower=1e-8))
 scores2 <- data.table(FocalID=Y2$FocalID,fa2$scores)
@@ -72,7 +74,22 @@ for (i in 1:10) {
   fit2[[i]] <- sampling(lmma,data=standat,chains=2,iter=2000,warmup=500,thin=2,
                 pars=c("alpha","beta","sigma_eps","sigma_g","h2"))
 }
+h2samp <- lapply(c(fit,fit2),function(x) extract(x,pars="h2")[[1]])
+h2comp <- rbind(data.table(V1=sapply(h2samp,mean),
+           model=rep(c("Factor model 1","Factor model 2"),each=10),
+           se=sapply(h2samp,sd)),
+           r2sum[,.(mean(h2),model="State model",se=sd(h2)),by=topic][,-1]) #from readtopic.R
+h2comp$type <- "Heritability"
 
+p1 <- ggplot(repcomp,aes(y=V1,x=model)) +
+  geom_pointrange(aes(ymin=V1-se,ymax=V1+se),position = position_jitter(width=0.2,height=0),size=0.33) +
+  ylab(expression(paste("Pearson's ", italic("r")))) + xlab("") + ggtitle("Repeatability") + 
+  theme_light() + theme(plot.title = element_text(hjust = 0.5,size=11))
+
+p2 <- ggplot(h2comp,aes(y=V1,x=model)) +
+  geom_pointrange(aes(ymin=V1-se,ymax=V1+se),position = position_jitter(width=0.2,height=0),size=0.33) +
+  ylab(expression(paste(h^2))) + xlab("") + ggtitle("Heritability") + 
+  theme_light() + theme(plot.title = element_text(hjust = 0.5,size=11))
 
 ##### simulate fa data
 Ysd <- sapply(Y[,-(1:ncovcols)],sd)
