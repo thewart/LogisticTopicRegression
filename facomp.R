@@ -2,21 +2,27 @@ library(mvtnorm)
 source('~/code/LogisticTopicRegression/R2julia.R')
 ID <- Y[,unique(FocalID)]
 
-
+##estimate FA1
 fa1 <- factanal(Y[,-(1:ncovcols)],factors = 10,scores = "regression",control=list(nstart=50,lower=1e-8))
 scores <- cbind(Y[,c(1,2,4)],fa1$scores) %>% melt()
 
-#repeatability -- obs level
+##estimate FA2
+Y2 <- melt(Y[,-c(3,5)])[,mean(value),by=.(FocalID,variable)] %>% dcast(formula=FocalID~variable)
+fa2 <- factanal(Y2[,-(1)],factors = 10,scores = "regression",control=list(nstart=50,lower=1e-8))
+scores2 <- data.table(FocalID=Y2$FocalID,fa2$scores)
+
+##### repeatability across years
+#repeatability -- obs level (FA1)
 repid <- scores[,length(unique(Year)),by=FocalID]
 repscores <- scores[FocalID %in% repid[V1==2,FocalID],mean(value),by=.(FocalID,Year,variable)]
 repscores <- dcast(repscores,FocalID+variable~ Year)
 repscores <- repscores[,cor(`2012`,`2013`),by=variable]
 repscores$model <- "Factor model 1"
 
-#repeatability -- org level
+#repeatability -- org level (FA2)
 Y2 <- melt(Y[,-c(3,5)])[,mean(value),by=.(FocalID,Year,variable)] %>% dcast(formula=FocalID+Year~variable)
-fa2 <- factanal(Y2[,-(1:2)],factors = 10,scores = "regression",control=list(nstart=50,lower=1e-8))
-repscores2 <- cbind(Y2[,1:2],fa2$scores)[FocalID %in% repid[V1==2,FocalID]]
+fa2rep <- factanal(Y2[,-(1:2)],factors = 10,scores = "regression",control=list(nstart=50,lower=1e-8))
+repscores2 <- cbind(Y2[,1:2],fa2rep$scores)[FocalID %in% repid[V1==2,FocalID]]
 repscores2 <- melt(repscores2) %>% dcast(formula = FocalID+variable ~ Year)
 repscores2 <- repscores2[,cor(`2012`,`2013`),by=variable]
 repscores2$model <- "Factor model 2"
@@ -50,6 +56,8 @@ ggplot(repcomp,aes(x=V1,fill=model)) +
   scale_fill_discrete(name=NULL)
 
 #### heritability
+
+##prepare to estimate h2 for FA components
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -57,6 +65,7 @@ lmma <- stan_model("~/code/multivarlmm/lmm_animal.stan")
 LA <- t(chol(A))
 standat <- list(N=nrow(X),P=ncol(X),X=X,L_A=LA,R=nrow(A))
 
+##estimate h2 for FA1
 mscores <- scores[,mean(value),by=.(variable,FocalID)]
 facts <- mscores[,unique(variable)]
 fit <- list()
@@ -66,9 +75,7 @@ for (i in 1:10){
                        pars=c("alpha","beta","sigma_eps","sigma_g","h2"))
 }
 
-Y2 <- melt(Y[,-c(3,5)])[,mean(value),by=.(FocalID,variable)] %>% dcast(formula=FocalID~variable)
-fa2 <- factanal(Y2[,-(1)],factors = 10,scores = "regression",control=list(nstart=50,lower=1e-8))
-scores2 <- data.table(FocalID=Y2$FocalID,fa2$scores)
+##estimate h2 for FA2
 fit2 <- list()
 for (i in 1:10) {
   standat$Y <- scores2[,i+1,with=F] %>% unlist()
@@ -83,6 +90,7 @@ h2comp <- rbind(data.table(V1=sapply(h2samp,mean),
 h2comp$type <- "Heritability"
 h2comp[,model:=ordered(model,levels=c("State model","Factor model 1","Factor model 2"))]
 
+## h2 plots
 p1 <- ggplot(repcomp,aes(y=V1,x=model)) +
   geom_pointrange(aes(ymin=V1-se,ymax=V1+se),position = position_jitter(width=0.2,height=0),size=0.33) +
   ylab("Repeatability") + xlab("") + 
@@ -93,11 +101,13 @@ p2 <- ggplot(h2comp,aes(y=V1,x=model)) +
   ylab("Heritability") + xlab("") + 
   theme_light() + theme(plot.title = element_text(hjust = 0.5,size=11))
 
-##### simulate fa data
+
+##### Posterior predictive comparisons
+
+## simulate FA1 data
 Ysd <- sapply(Y[,-(1:ncovcols)],sd)
 Ymu <- sapply(Y[,-(1:ncovcols)],mean)
 Sigma <- diag(Ysd) %*% (fa1$loadings %*% t(fa1$loadings) + diag(fa1$uniquenesses)) %*% diag(Ysd)
-#Sigma <- cov(Y[,-(1:ncovcols)])
 Yrep_fa <- rmvnorm(1e6,Ymu,Sigma) %>% as.data.table()
 for (i in 1:length(Yrep_fa)) {
   maxi <- max(Y[,-(1:ncovcols)][[i]])
@@ -146,6 +156,8 @@ for (j in 1:length(ID)) {
 Yrep_top[,`NonContactAgg(receive)`:=`NonContactAgg(receive)` > 1]
 setcolorder(Yrep_top,c(3,1,2))
 Yrep_top$Model <- "State model"
+
+#PPC plotz
 repdat <- rbind(Yrep_top,Ytmp,Yrep_fa)[,.(Travel=mean(Travel),n=length(Travel),ste=2*sd(Travel)/sqrt(length(Travel))),by=.(Feed,`NonContactAgg(receive)`,Model)]
 repdat[Model!="Cayo Santiago data set",ste:=0]
 repdat[,Model:=ordered(Model,levels=unique(Model)[c(2,1,3)])]

@@ -6,7 +6,6 @@ fpath <- paste0(basepath,c("F2013/Txtexports_all_processed.csv",
                            "HH2014/Txtexports_all_processed.csv",
                            "R2015/Txtexports_all_processed.csv"))
 ptetho <- defaultpoint2()[type!="misc" & !(behavior%in%c("Vigilnce","PsCnTerm","GrmTerm","GrmPrsnt"))]
-#ptetho <- c("AffVoc","Approach","FearGrm","Leave","Submit","Vigilnce","avoid","contactAgg","displace","noncontactAgg","threat")
 stetho <- defaultstate2()[type!="misc" & state!="Corral"]
 Y <- collectfocal(fpath,ptetho,stetho,group = c("F","F","HH","R"))
 Y <- Y[FocalID %in% Y[,length(Observation),by=FocalID][V1>10,FocalID]]

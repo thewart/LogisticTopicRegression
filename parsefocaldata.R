@@ -85,6 +85,8 @@ statprep <- function(stat,dat,maxsec=630,nsec=NA,ctmc=F) {
     
     if (length(zilch) > 0) {
       zilch <- expand.grid(stat,0,zilch)[,3:1] %>% as.data.table()
+      zilch[[1]] <- as.character(zilch[[1]])
+      zilch[[3]] <- as.character(zilch[[3]])
       setnames(zilch,names(sdat))
       sdat <- rbind(sdat,zilch)
     }
@@ -111,13 +113,16 @@ countprep <- function(behav,dat,adultsonly=T) {
 }
 
 scanprep <- function(dat) {
-  dat <- dat[Behavior=="scan",.(In2mCode,
+  scandat <- dat[Behavior=="scan",.(In2mCode,
                           N2m=sapply(RelativeEventTime,function(x) abs(x-c(0,300,600)) %>% which.min)),
        by=.(FocalID,Observation)]
-  dat[,In2mPart:=!(In2mCode %in% c("In 2m? (8)","In 2m? (0)"))]
+  scandat[,In2mPart:=!(In2mCode %in% c("In 2m? (8)","In 2m? (0)"))]
+  out <- scandat[,.(ScanProx=length(unique(N2m[In2mPart])),ScanProxInd=length(unique(In2mCode[In2mPart]))),by=Observation]
   
-  return(dat[,.(ScanProx=length(unique(N2m[In2mPart])),ScanProxInd=length(unique(In2mCode[In2mPart]))),by=Observation])
-  
+  #scannless observations
+  noscan <- dat[,("scan" %in% Behavior),by=.(Observation)][V1==F,Observation]
+  if (length(noscan)>0) out <- rbind(out,data.table(Observation=noscan,ScanProx=NA,ScanProxInd=NA))
+  return(out)
 }
 
 #divide behaviors in ptetho based on matching to modifiers
@@ -132,7 +137,7 @@ eventsplit <- function(behav,ptetho,modifier,n) {
   }
 }
                              
-collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group,fixyear=T)
+collectfocal <- function(bdat,ptetho=NULL,stetho=NULL,nsec=NA,group,fixyear=T,state.maxsec=630)
 {
   if (is.null(stetho))
     stetho <- defaultstate()
@@ -140,19 +145,11 @@ collectfocal <- function(files,ptetho=NULL,stetho=NULL,nsec=NA,group,fixyear=T)
   if (is.null(ptetho))   
     ptetho <- defaultpoint2()
   
-  bdat <- list()
-  for (i in 1:length(files)) {
-    bdat[[i]] <- fread(files[i])
-    bdat[[i]] <- copy(bdat[[i]][!overtime & !BadObs])
-    bdat[[i]] <- bdat[[i]][FocalID %in% bdat[[i]][,length(unique(Observation)),by=FocalID][V1>10,FocalID]]
-    if (fixyear) bdat[[i]]$Year <- bdat[[i]][,table(Year)] %>% which.max() %>% names()
-    bdat[[i]]$Group <- group[i]
-  }
-  bdat <- do.call(rbind,bdat)
+  if (is.character(bdat)) bdat <- readfocfiles(bdat,group)
   
   #construct state data
   ss <- sapply(stetho,length)
-  Xs <- stetho[,statprep(behavior,dat = bdat,nsec = nsec),by=state] %>% 
+  Xs <- stetho[,statprep(behavior,dat = bdat,nsec = nsec, maxsec = state.maxsec),by=state] %>% 
     dcast(Observation ~ behavior,value.var="value") %>% setcolorder(c("Observation",stetho$behavior))
 
   #construct count data
@@ -177,4 +174,16 @@ trimstatebegins <- function(dat,cutoff=10) { #remove first *cutoff* seconds of s
   dat <- dat[!( (RelativeEventTime==0) & (Duration > 0) &  ((Duration+RelativeEventTime) < cutoff ))]
   dat[(Duration>0) & (RelativeEventTime<cutoff), Duration:=Duration-(cutoff-RelativeEventTime)]
   #dat <- dat[!(Duration>0 & (RelativeEventTime+Duration)<10)]
+}
+
+readfocfiles <- function(files,group,minobs=11,fixyear=T) {
+  bdat <- list()
+  for (i in 1:length(files)) {
+    bdat[[i]] <- fread(files[i])
+    bdat[[i]] <- copy(bdat[[i]][!overtime & !BadObs])
+    bdat[[i]] <- bdat[[i]][FocalID %in% bdat[[i]][,length(unique(Observation)),by=FocalID][V1>=minobs,FocalID]]
+    if (fixyear) bdat[[i]]$Year <- bdat[[i]][,table(Year)] %>% which.max() %>% names()
+    bdat[[i]]$Group <- group[i]
+  }
+  return(do.call(rbind,bdat))
 }
