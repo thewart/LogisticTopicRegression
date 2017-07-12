@@ -122,10 +122,10 @@ function sim_dat(n::Int64=100,nd::Int64=50,K::Int64=5,d::Int64=10,l::Int64=3,p::
   return sim
 end
 
-function mlinit_dirichlet(y::Vector{Array{Int64,2}},K::Int64,d::Int64,L::Vector{Int64},nruns::Int64=10);
+function mlinit_dirichlet(y::Vector{Array{Int64,2}},K::Int64,d::Int64,L::Vector{Int64},nruns::Int64=10,noise::Float64=0.5,maxiter::Int64=100);
 
   Y = hcat(y...)';
-  @rput K d L Y
+  @rput K d L Y noise maxiter
   R"library(rstan)"
   R"topetho <- stan_model('~/code/topetho/categorical_topetho.stan')";
   R"dat <- list(Y=Y,n=nrow(Y),K=K,B=d,Bs=L,alpha_p=1,alpha_t=1)";
@@ -133,9 +133,10 @@ function mlinit_dirichlet(y::Vector{Array{Int64,2}},K::Int64,d::Int64,L::Vector{
   ll = Vector{Float64}(nruns);
   r = Vector{Array{Float64,2}}(nruns);
   @time for i in 1:nruns
-    R"init <- list(pi=gtools::rdirichlet(1,alpha = rep(1,dat$K)) %>% as.vector(),theta_raw=apply(Y,2,function(x) table(x) %>% prop.table()))";
-    R"init$theta_raw <- init$theta_raw * pmax(1-rnorm(length(init$theta_raw),sd=0.5),0.01)";
-    R"optout <- optimizing(topetho,dat,verbose=F,iter=100)";
+    R"init <- list(pi=gtools::rdirichlet(1,alpha = rep(1,dat$K)) %>% as.vector(),
+    theta_raw=apply(Y,2,function(x) table(x) %>% prop.table()) %>% unlist() %>% matrix(nrow=dat$K,ncol=sum(dat$Bs),byrow = T))";
+    R"init$theta_raw <- init$theta_raw * pmax(1-rnorm(length(init$theta_raw),sd=noise),0.01)";
+    R"optout <- optimizing(topetho,dat,verbose=F,init=init,iter=400)";
     ll[i] = rcopy(R"optout$value");
     r[i] = rcopy(R"optout$par[str_detect(names(optout$par),'^r\\[')] %>% matrix(nrow=dat$K,ncol=dat$n,byrow = T)")
   end
