@@ -19,6 +19,7 @@ export
   PoissonPosterior,
   DirMultPosterior,
   CategoricalPosterior,
+  NormalMeanPosterior,
 
   #functions
   simplemix,
@@ -45,6 +46,7 @@ include("vectorposterior.jl")
 include("gammapoisson.jl");
 include("dirichletmultinomial.jl");
 include("categorical.jl")
+include("normal_fixedvar.jl")
 include("topicllm.jl");
 include("prediction.jl")
 include("llmhelpers.jl")
