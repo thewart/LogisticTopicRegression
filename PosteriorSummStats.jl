@@ -1,4 +1,4 @@
-abstract PostPredSS
+abstract type PostPredSS end
 import Base.length
 import Base.getindex
 
