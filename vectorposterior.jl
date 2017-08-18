@@ -46,8 +46,8 @@ end
 addsample!{T<:Real}(pp::VectorPosterior,ynew::Array{T,2}) =
   for i in 1:length(pp) addsample!(pp,ynew[:,j]); end
 
-addsample!{T<:Real}(pp::VectorPosterior,ynew::T) =
-  for i in 1:length(pp) addsample!(pp[i],ynew); end
+#addsample!{T<:Real}(pp::VectorPosterior,ynew::T) =
+#  for i in 1:length(pp) addsample!(pp[i],ynew); end
 
 #remove one observation
 function pullsample!{T<:Real}(pp::VectorPosterior,yold::AbstractVector{T})
@@ -57,8 +57,8 @@ end
 pullsample!{T<:Real}(pp::VectorPosterior,yold::Array{T,2}) =
   for i in 1:length(pp) pullsample!(pp,yold[:,j]); end
 
-pullsample!{T<:Real}(pp::VectorPosterior,yold::T) =
-  for i in 1:length(pp) pullsample!(pp[i],yold); end
+#pullsample!{T<:Real}(pp::VectorPosterior,yold::T) =
+#  for i in 1:length(pp) pullsample!(pp[i],yold); end
 
 
 #get topic parameter distribution

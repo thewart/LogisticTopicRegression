@@ -11,7 +11,7 @@ function sample_z!{T<:Real}(z::Vector{Int64},topic::Vector{VectorPosterior},nk::
       logpost[k] = log(π[k]) + lppd(y[:,j],topic[k]);
     end
     logpostnorm = logpost - logsumexp(logpost);
-    z[j] = rand(Categorical(exp(logpostnorm)));
+    z[j] = rand(Categorical(exp.(logpostnorm)));
 
     addsample!(topic[z[j]],y[:,j]);
     nk[z[j]] += 1;

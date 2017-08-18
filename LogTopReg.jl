@@ -1,6 +1,5 @@
 module LogTopReg
 
-abstract PostPredSS
 using Distributions
 using StatsBase
 using StatsFuns
@@ -11,6 +10,8 @@ import Base.getindex
 import Base.rand
 import Base.vcat
 import Base.mean
+
+abstract type PostPredSS end
 
 export
   #types
@@ -43,11 +44,11 @@ export
   topiclmm
 
 include("vectorposterior.jl")
-include("gammapoisson.jl");
-include("dirichletmultinomial.jl");
+include("gammapoisson.jl")
+include("dirichletmultinomial.jl")
 include("categorical.jl")
 include("normal_fixedvar.jl")
-include("topicllm.jl");
+include("topicllm.jl")
 include("prediction.jl")
 include("llmhelpers.jl")
 include("llmsamplers.jl")
