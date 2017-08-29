@@ -49,6 +49,38 @@ function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
   :ν0_τ => ν0_τ, :τ0_u => τ0_u, :ν0_u => ν0_u, :τ_β => τ_β)
 end
 
+function init_params(K,n)
+  return Dict{Symbol,Array{Float64}}(
+    :σ2_η => rand(K)*2,
+    :τ_μ => [rand()*2],
+    :η => randn(K,n)*2,
+    :τ_u = exp(randn(K)))
+end
+
+function init_topic!{T<:Real}(topic::Vector{VectorPosterior},z::Vector{Vector{Int64}},y::Vector{Array{T,2}})
+  n = length(y);
+  K = length(topic);
+  nd = size.(y,2);
+
+  nk = Array{Int64}(K,n);
+  for i in 1:n
+    nk[:,i] = map(k -> countnz(z[i].==k),1:K);
+    for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
+  end
+  return nk
+end
+
+function init_topic!{T<:Real}(topic::Vector{VectorPosterior},η::Array{Float64,2},y::Vector{Array{T,2}})
+  n = length(y);
+  K = length(topic);
+
+  z = Vector{Vector{Int64}}();
+  for i in 1:n z[i] = sample(1:K,softmax(η[:,i]),size(y[i],2)); end
+  nk = init_topic!(topic,z,y);
+  return nk, z
+end
+
+
 function refβ(β::Array{Float64,2},refk::Int64)
   return β .- β[:,refk:refk]
 end

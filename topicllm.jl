@@ -2,6 +2,7 @@
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Float64,2},pss0::VectorPosterior,K::Int,
                            hy::Dict{Symbol,Float64}=hyperparameter();
                            zinit::Vector{Vector{Int64}}=Vector{Vector{Int64}}(),
+                           θinit::Dict{Symbol,Array{Float64}}=Dict{Symbol,Array{Float64}}(),
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
@@ -18,21 +19,21 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
   ν0_u = hy[:ν0_u];
   τ_β = hy[:τ_β];
 
+  θinit = merge(init_params(K,n),θinit);
+  σ2_η = θinit[:σ2_η];
+  τ_μ = θinit[:τ_μ][1];
+  η = θinit[:η];
+  τ_u = θinit[:τ_u];
+
   #K0 = rand(round(Int64,K/2):K);
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
-  nd = map(i -> size(y[i])[2],1:n);
+  nd = size.(y,2);
 
   if isempty(zinit)
-    wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
-    z = map(d -> sample(1:K,wv,size(d)[2]),y);
+    nk, z = init_topic!(topic,η,y);
   else
-    z = zinit;
-  end
-  nk = Array{Int64}(K,n);
-  for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
-  for i in 1:n
-    for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
+    nk = init_topic!(topic,z,y);
   end
   ZtZ = Z'Z;
   XtX = X'X;
@@ -40,13 +41,9 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},Z::Array{Fl
   Lβ = inv( chol( X*X' + I*inv(τ_β)));
   ΣβX = Lβ*Lβ'*X;
 
-  σ2_η = rand(K)*2;
-  τ_μ = rand()*2;
-  η = randn(K,n)*2;
   μ_η = Array{Float64}(K);
   w = Array{Float64}(n);
   u = Array{Float64}(n,K);
-  τ_u = exp(randn(K));
   β = Array{Float64,2}(p,K);
 
   saveiter = thin:thin:iter;
@@ -118,6 +115,7 @@ end
 function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::VectorPosterior,K::Int,
                            hy::Dict{Symbol,Float64}=hyperparameter();
                            zinit::Vector{Vector{Int64}}=Vector{Vector{Int64}}(),
+                           θinit::Dict{Symbol,Array{Float64}}=Dict{Symbol,Array{Float64}}(),
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
@@ -132,20 +130,19 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   ν0_τ = hy[:ν0_τ];
   τ_β = hy[:τ_β];
 
+  θinit = merge(init_params(K,n),θinit);
+  σ2_η = θinit[:σ2_η];
+  τ_μ = θinit[:τ_μ][1];
+  η = θinit[:η];
+
   topic = Vector{VectorPosterior}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
-  nd = map(i -> size(y[i])[2],1:n);
+  nd = size.(y,2);
 
   if isempty(zinit)
-    wv = weights(rand(Dirichlet(K,rand(Uniform(1/K,1)))));
-    z = map(d -> sample(1:K,wv,size(d)[2]),y);
+    nk, z = init_topic!(topic,η,y);
   else
-    z = zinit;
-  end
-  nk = Array{Int64}(K,n);
-  for i in 1:n nk[:,i] = map(k -> countnz(z[i].==k),1:K); end
-  for i in 1:n
-    for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
+    nk = init_topic!(topic,z,y);
   end
 
   XtX = X'X;
@@ -154,9 +151,6 @@ function topiclmm{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},pss0::Vecto
   invaddIτXtX = inv(I+τ_β*XtX);
   suminvaddIτXtX = sum(invaddIτXtX);
 
-  σ2_η = rand(K)*2;
-  τ_μ = rand()*2;
-  η = randn(K,n)*2;
   μ_η = Array{Float64}(K);
   w = Array{Float64}(n);
   β = Array{Float64,2}(p,K);
