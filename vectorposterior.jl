@@ -1,27 +1,27 @@
 type VectorPosterior{T<:PostPredSS}
   PP::Vector{T}
-  span::Vector{Union{Int64,UnitRange{Int64}}}
+  span::Vector{UnitRange{Int64}}
 end
 
 function VectorPosterior{T<:PostPredSS}(pp::Vector{T})
-  span = Vector{Union{Int64,UnitRange{Int64}}}(length(pp));
+  span = Vector{UnitRange{Int64}}(length(pp));
   j = 0;
   for i in 1:length(pp)
     dpp = dim(pp[i]);
-    dpp > 1 ? span[i] = ((j+1):(j+dpp)) : (span[i] = j+1);
+    span[i] = ((j+1):(j+dpp));
     j += dim(pp[i]);
   end
   VectorPosterior(pp,span)
 end
-function VectorPosterior(x::Union{PostPredSS,Int64}...)
+function VectorPosterior{T<:PostPredSS}(x::Union{T,Int64}...)
   l = cumsum(collect(x[2:2:length(x)]));
-  pp = Vector{PostPredSS}(maximum(l));
+  pp = Vector{T}(maximum(l));
   for i in 1:maximum(l)
     pp[i] = deepcopy(x[findfirst(l .>= i)*2 - 1]);
   end
   VectorPosterior(pp)
 end
-VectorPosterior(pp::PostPredSS) = VectorPosterior([pp]);
+VectorPosterior{T<:PostPredSS}(pp::T) = VectorPosterior([pp]);
 
 getindex(VP::VectorPosterior,i) = VP.PP[i];
 length(VP::VectorPosterior) = length(VP.PP);
@@ -39,40 +39,24 @@ end
 
 
 #add one new observation
-function addsample!{T<:Real}(pp::VectorPosterior,ynew::AbstractVector{T})
+function addsample!{T<:Real,U<:PostPredSS}(pp::VectorPosterior{U},ynew::AbstractVector{T})
   for i in 1:length(pp) addsample!(pp[i],ynew[pp.span[i]]); end
 end
 
-addsample!{T<:Real}(pp::VectorPosterior,ynew::Array{T,2}) =
+addsample!{T<:Real,U<:PostPredSS}(pp::VectorPosterior{U},ynew::Array{T,2}) =
   for i in 1:length(pp) addsample!(pp,ynew[:,j]); end
 
 #addsample!{T<:Real}(pp::VectorPosterior,ynew::T) =
 #  for i in 1:length(pp) addsample!(pp[i],ynew); end
 
 #remove one observation
-function pullsample!{T<:Real}(pp::VectorPosterior,yold::AbstractVector{T})
+function pullsample!{T<:Real,U<:PostPredSS}(pp::VectorPosterior{U},yold::AbstractVector{T})
   for i in 1:length(pp) pullsample!(pp[i],yold[pp.span[i]]); end
 end
 
-pullsample!{T<:Real}(pp::VectorPosterior,yold::Array{T,2}) =
+pullsample!{T<:Real,U<:PostPredSS}(pp::VectorPosterior{U},yold::Array{T,2}) =
   for i in 1:length(pp) pullsample!(pp,yold[:,j]); end
 
-#pullsample!{T<:Real}(pp::VectorPosterior,yold::T) =
-#  for i in 1:length(pp) pullsample!(pp[i],yold); end
-
-
-#get topic parameter distribution
-function topicpd(pp::VectorPosterior)
-  topic = Vector{Sampleable}(length(pp));
-  for i in 1:length(pp) topic[i] = topicpd(pp[i]); end
-  return topic
-end
-
-function topicppd(pp::VectorPosterior)
-  topic = Vector{Sampleable}(length(pp));
-  for i in 1:length(pp) topic[i] = topicppd(pp[i]); end
-  return topic
-end
 
 #utilities for distribution vectors
 function rand{T<:Sampleable}(dv::Vector{T},n::Int64=1)

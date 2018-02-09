@@ -39,3 +39,5 @@ lppd{T<:Real}(y::Vector{T},pp::DirMultPosterior) = lppd(pp,round(Int64,y));
 function topicpd(pp::DirMultPosterior)
   return Dirichlet(pp.n)
 end
+
+randtopic(pp::DirMultPosterior,n::Int64=1) = Multinomial(n,rand(topicpd(pp)));

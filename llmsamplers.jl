@@ -1,5 +1,4 @@
-function sample_z!{T<:Real}(z::Vector{Int64},topic::Vector{VectorPosterior},nk::AbstractVector{Int64},
-  π::Vector{Float64},y::Array{T,2},K::Int64)
+function sample_z!(z,topic,nk,π,y,K)
 
   logpost = Vector{Float64}(K);
   for j in 1:length(z)

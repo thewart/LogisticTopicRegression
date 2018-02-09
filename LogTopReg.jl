@@ -15,6 +15,8 @@ abstract type PostPredSS end
 
 export
   #types
+  TLMMsample,
+  TLMMfit,
   PostPredSS,
   VectorPosterior,
   PoissonPosterior,
@@ -39,16 +41,21 @@ export
   length,
   sim_dat,
   mlinit_dirichlet,
+  randtopic,
+  init_params,
+  init_params!,
 
   #the whole point
   topiclmm
 
 include("vectorposterior.jl")
+include("outputtype.jl")
 include("gammapoisson.jl")
 include("dirichletmultinomial.jl")
 include("categorical.jl")
 include("normalmean.jl")
 include("topicllm.jl")
+include("topicllm_uncolapsed.jl")
 include("prediction.jl")
 include("llmhelpers.jl")
 include("llmsamplers.jl")

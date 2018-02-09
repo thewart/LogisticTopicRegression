@@ -25,23 +25,22 @@ function makecov(XtX::Array{Float64,2},τ_β::Float64,τ_μ::Float64)
   return inv(V)
 end
 
-
-function init_post(n::Int64,nd::Vector{Int64},K::Int64,p::Int64,nsave::Int64,isu::Bool)
-  post = Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}}();
-  post[:z] = Vector{Array{Int,2}}(n);
-  for i in 1:n post[:z][i] = Array{Int}(nd[i],nsave); end
-  post[:μ] = Array{Float64}(K,nsave);
-  post[:σ2] = Array{Float64}(K,nsave);
-  post[:τ] = Vector{Float64}(nsave);
-  post[:topic] = Array{VectorPosterior,2}(K,nsave);
-  post[:η] = Array{Float64}(K,n,nsave);
-  post[:β] = Array{Float64}(p,K,nsave);
-  return post
-  if isu
-    post[:u] = Array{Float64}(n,K,nsave);
-    post[:τ_u] = Array{Float64,2}(K,nsave);
-  end
-end
+# function init_post(n::Int64,nd::Vector{Int64},K::Int64,p::Int64,nsave::Int64,isu::Bool)
+#   post = Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}}();
+#   post[:z] = Vector{Array{Int,2}}(n);
+#   for i in 1:n post[:z][i] = Array{Int}(nd[i],nsave); end
+#   post[:μ] = Array{Float64}(K,nsave);
+#   post[:σ2] = Array{Float64}(K,nsave);
+#   post[:τ] = Vector{Float64}(nsave);
+#   post[:topic] = Array{VectorPosterior,2}(K,nsave);
+#   post[:η] = Array{Float64}(K,n,nsave);
+#   post[:β] = Array{Float64}(p,K,nsave);
+#   return post
+#   if isu
+#     post[:u] = Array{Float64}(n,K,nsave);
+#     post[:τ_u] = Array{Float64,2}(K,nsave);
+#   end
+# end
 
 function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
   τ0_τ = 0.25,ν0_τ = 1.0,τ0_u = 0.25,ν0_u=1.0,τ_β=1.0)
@@ -49,37 +48,23 @@ function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
   :ν0_τ => ν0_τ, :τ0_u => τ0_u, :ν0_u => ν0_u, :τ_β => τ_β)
 end
 
-function init_params(K,n)
-  return Dict{Symbol,Array{Float64}}(
-    :σ2_η => rand(K)*2,
-    :τ_μ => [rand()*2],
-    :η => randn(K,n)*2,
-    :τ_u = exp(randn(K)))
-end
-
-function init_topic!{T<:Real}(topic::Vector{VectorPosterior},z::Vector{Vector{Int64}},y::Vector{Array{T,2}})
+function init_topic(pss0,K,z,y)
   n = length(y);
-  K = length(topic);
   nd = size.(y,2);
 
-  nk = Array{Int64}(K,n);
+  topic = Vector{typeof(pss0)}(K);
+  map!(k -> deepcopy(pss0),topic,1:K);
   for i in 1:n
-    nk[:,i] = map(k -> countnz(z[i].==k),1:K);
     for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
   end
-  return nk
 end
 
-function init_topic!{T<:Real}(topic::Vector{VectorPosterior},η::Array{Float64,2},y::Vector{Array{T,2}})
-  n = length(y);
-  K = length(topic);
-
-  z = Vector{Vector{Int64}}();
-  for i in 1:n z[i] = sample(1:K,softmax(η[:,i]),size(y[i],2)); end
-  nk = init_topic!(topic,z,y);
-  return nk, z
+function init_z(η,K,docrng)
+  n = length(grps);
+  z = Vector{Int64}(n);
+  for i in 1:n z[docrng[i]] = sample(1:K,Weights(softmax(η[:,i])),length(docrng[i])); end
+  return z
 end
-
 
 function refβ(β::Array{Float64,2},refk::Int64)
   return β .- β[:,refk:refk]

@@ -1,5 +1,5 @@
 #log posterior predictive density
-function lppd{T<:Real}(y::AbstractVector{T},pp::VectorPosterior)
+function lppd{T<:Real,U<:PostPredSS}(y::AbstractVector{T},pp::VectorPosterior{U})
   out = 0.0;
   for i in 1:length(pp)
     out += lppd(y[pp.span[i]],pp[i]);
@@ -7,7 +7,7 @@ function lppd{T<:Real}(y::AbstractVector{T},pp::VectorPosterior)
   return out
 end
 
-function lppd{T<:Real}(y::Array{T,2},pp::VectorPosterior)
+function lppd{T<:Real,U<:PostPredSS}(y::Array{T,2},pp::VectorPosterior{U})
   out = 0.0;
   for j in 1:size(y)[2]
     out += lppd(y[:,j],pp);
@@ -16,14 +16,14 @@ function lppd{T<:Real}(y::Array{T,2},pp::VectorPosterior)
 end
 
 #log posterior predictive, integrating across indicator variables
-function lppd{T<:Real}(y::AbstractVector{T},ppv::Vector{VectorPosterior},π::Vector{Float64})
+function lppd{T<:Real,U<:PostPredSS}(y::AbstractVector{T},ppv::Vector{VectorPosterior{U}},π::Vector{Float64})
   K = length(ppv);
   lp = Vector{Float64}(K);
   for k in 1:K lp[k] = log(π[k]) + lppd(y,ppv[k]); end
   return logsumexp(lp)
 end
 
-function lppd{T<:Real}(y::Array{T,2},ppv::Vector{VectorPosterior},π::Vector{Float64})
+function lppd{T<:Real,U<:PostPredSS}(y::Array{T,2},ppv::Vector{VectorPosterior{U}},π::Vector{Float64})
   n = size(y)[2];
   lp = 0;
   for i in 1:n lp += lppd(y[:,i],ppv,π); end
@@ -31,7 +31,7 @@ function lppd{T<:Real}(y::Array{T,2},ppv::Vector{VectorPosterior},π::Vector{Flo
 end
 
 #predictive density for new observations in same groups
-function lppd{T<:Real}(y::Vector{Array{T,2}},fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}})
+function lppd{T<:Real}(y::Vector{Array{T,2}},fit)
 
   n = length(y);
   m = size(fit[:η])[3];
@@ -47,7 +47,7 @@ function lppd{T<:Real}(y::Vector{Array{T,2}},fit::Dict{Symbol,Union{AbstractArra
 end
 
 #predictive density for new groups
-function lppd{T<:Real}(y::Array{T,2},X::Vector{Float64},topic::Vector{VectorPosterior},
+function lppd{T<:Real,U<:PostPredSS}(y::Array{T,2},X::Vector{Float64},topic::Vector{VectorPosterior{U}},
   β::Array{Float64,2},μ::Vector{Float64},σ2::Vector{Float64},nsim::Int64=1)
 
   π = Vector{Float64}(length(topic));
@@ -65,8 +65,7 @@ function lppd{T<:Real}(y::Array{T,2},X::Vector{Float64},topic::Vector{VectorPost
   return lp/nsim
 end
 
-function lppd{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},
-  fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},nsim::Int64=1)
+function lppd{T<:Real}(y::Vector{Array{T,2}},X::Array{Float64,2},fit,nsim::Int64=1)
 
   n = length(y);
   m = size(fit[:β])[3];

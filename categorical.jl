@@ -25,3 +25,5 @@ end
 function topicppd(pp::CategoricalPosterior)
   return Categorical(pp.n./sum(pp.n))
 end
+
+randtopic(pp::CategoricalPosterior) = Categorical(rand(topicpd(pp)));
