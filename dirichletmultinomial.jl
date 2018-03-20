@@ -1,4 +1,4 @@
-type DirMultPosterior <: PostPredSS
+mutable struct DirMultPosterior <: PostPredSS
   K::Int64
   n::Vector{Float64}
 

@@ -1,4 +1,4 @@
-function makecov(XtX::Array{Float64,2},ZtZ::Array{Float64,2},
+function makeprec(XtX::Array{Float64,2},ZtZ::Array{Float64,2},
   τ_β::Float64,τ_u::Float64,τ_μ::Float64)
 
   n = size(XtX)[1];
@@ -12,7 +12,7 @@ function makecov(XtX::Array{Float64,2},ZtZ::Array{Float64,2},
   return inv(V)
 end
 
-function makecov(XtX::Array{Float64,2},τ_β::Float64,τ_μ::Float64)
+function makeprec(XtX::Array{Float64,2},τ_β::Float64,τ_μ::Float64)
 
   n = size(XtX)[1];
   V = Array{Float64,2}(n,n);
@@ -25,43 +25,23 @@ function makecov(XtX::Array{Float64,2},τ_β::Float64,τ_μ::Float64)
   return inv(V)
 end
 
-# function init_post(n::Int64,nd::Vector{Int64},K::Int64,p::Int64,nsave::Int64,isu::Bool)
-#   post = Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}}();
-#   post[:z] = Vector{Array{Int,2}}(n);
-#   for i in 1:n post[:z][i] = Array{Int}(nd[i],nsave); end
-#   post[:μ] = Array{Float64}(K,nsave);
-#   post[:σ2] = Array{Float64}(K,nsave);
-#   post[:τ] = Vector{Float64}(nsave);
-#   post[:topic] = Array{VectorPosterior,2}(K,nsave);
-#   post[:η] = Array{Float64}(K,n,nsave);
-#   post[:β] = Array{Float64}(p,K,nsave);
-#   return post
-#   if isu
-#     post[:u] = Array{Float64}(n,K,nsave);
-#     post[:τ_u] = Array{Float64,2}(K,nsave);
-#   end
-# end
-
-function hyperparameter(;ν0_σ2η=1.0,σ0_σ2η = 1.0,
-  τ0_τ = 0.25,ν0_τ = 1.0,τ0_u = 0.25,ν0_u=1.0,τ_β=1.0)
+function hyperparameter(;ν0_σ2η=0.01,σ0_σ2η = 0.01,
+  τ0_τ = 0.01,ν0_τ = 0.01,τ0_u = 0.01,ν0_u=0.01,τ_β=5.0)
   return Dict(:ν0_σ2η => ν0_σ2η, :σ0_σ2η => σ0_σ2η, :τ0_τ => τ0_τ,
   :ν0_τ => ν0_τ, :τ0_u => τ0_u, :ν0_u => ν0_u, :τ_β => τ_β)
 end
 
 function init_topic(pss0,K,z,y)
-  n = length(y);
-  nd = size.(y,2);
-
   topic = Vector{typeof(pss0)}(K);
   map!(k -> deepcopy(pss0),topic,1:K);
-  for i in 1:n
-    for j in 1:nd[i] addsample!(topic[z[i][j]],y[i][:,j]); end
-  end
+  for i in 1:length(z) addsample!(topic[z[i]],y[:,i]); end
+  return topic
 end
 
 function init_z(η,K,docrng)
-  n = length(grps);
-  z = Vector{Int64}(n);
+  n = length(docrng);
+  nobs = maximum(last.(docrng));
+  z = Vector{Int64}(nobs);
   for i in 1:n z[docrng[i]] = sample(1:K,Weights(softmax(η[:,i])),length(docrng[i])); end
   return z
 end
@@ -72,6 +52,17 @@ end
 refβ(β::Array{Float64,3},refk::Int64) = β .- β[:,refk:refk,:]
 refβ(β::Array{Float64},μ::Array{Float64,1}) = refβ(β,findmax(μ)[2]);
 refβ(β::Array{Float64},μ::Array{Float64,2}) = refβ(β,findmax(mean(μ,2))[2]);
+
+function countz(z,docrng,K)
+    n = length(docrng);
+    nk = fill(0,(K,n));
+    for i in 1:n
+        for k in 1:K
+            nk[k,i] = countnz(z[docrng[i]].==k)
+        end
+    end
+    return nk
+end
 
 function writefit(fit::Dict{Symbol,Union{AbstractArray,Dict{Symbol,Float64}}},path::String)
   if !isdir(path) mkpath(path); end
@@ -137,37 +128,4 @@ function sim_dat(n::Int64=100,nd::Int64=50,K::Int64=5,d::Int64=10,l::Int64=3,p::
   sim[:μ] = μ;
 
   return sim
-end
-
-function mlinit_dirichlet(y::Vector{Array{Int64,2}},K::Int64,d::Int64,L::Vector{Int64},nruns::Int64=10,noise::Float64=0.5,maxiter::Int64=100);
-
-  Y = hcat(y...)';
-  @rput K d L Y noise maxiter
-  R"library(rstan)"
-  R"topetho <- stan_model('~/code/topetho/categorical_topetho.stan')";
-  R"dat <- list(Y=Y,n=nrow(Y),K=K,B=d,Bs=L,alpha_p=1,alpha_t=1)";
-
-  ll = Vector{Float64}(nruns);
-  r = Vector{Array{Float64,2}}(nruns);
-  @time for i in 1:nruns
-    R"init <- list(pi=gtools::rdirichlet(1,alpha = rep(1,dat$K)) %>% as.vector(),
-    theta_raw=apply(Y,2,function(x) table(x) %>% prop.table()) %>% unlist() %>% matrix(nrow=dat$K,ncol=sum(dat$Bs),byrow = T))";
-    R"init$theta_raw <- init$theta_raw * pmax(1-rnorm(length(init$theta_raw),sd=noise),0.01)";
-    R"optout <- optimizing(topetho,dat,verbose=F,init=init,iter=400)";
-    ll[i] = rcopy(R"optout$value");
-    r[i] = rcopy(R"optout$par[str_detect(names(optout$par),'^r\\[')] %>% matrix(nrow=dat$K,ncol=dat$n,byrow = T)")
-  end
-
-  maxr = r[findmax(ll)[2]];
-
-  zflat = mapslices(x -> rand(Categorical(x)),maxr,1);
-  z = Vector{Vector{Int64}}(length(y));
-  nd = map(x -> size(x)[2],y);
-  guh = 1;
-  for i in 1:length(y)
-    z[i] = zflat[guh:(guh+nd[i]-1)];
-    guh += nd[i];
-  end
-
-  return z
 end

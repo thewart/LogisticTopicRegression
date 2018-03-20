@@ -1,4 +1,4 @@
-type PoissonPosterior <: PostPredSS
+mutable struct PoissonPosterior <: PostPredSS
   n::Float64
   ys::Float64
 end
@@ -33,3 +33,5 @@ end
 function topicppd(pp::PoissonPosterior)
   return NegativeBinomial(pp.ys,1-inv(pp.n+1))
 end
+
+randtopic(pp::PoissonPosterior) = Poisson(rand(topicpd(pp)));

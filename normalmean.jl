@@ -1,4 +1,4 @@
-type NormalMeanPosterior <: PostPredSS
+mutable struct NormalMeanPosterior <: PostPredSS
   sumy::Float64
   n::Float64
   σ2::Float64
@@ -37,4 +37,4 @@ function topicppd(pp::NormalMeanPosterior)
     return Normal(μ,sqrt(σ2))
 end
 
-#randtopic(pp::NormalMeanPosterior) = Normal(rand(topicpd(pp)),sqrt(pp.σ2));
+randtopic(pp::NormalMeanPosterior) = Normal(rand(topicpd(pp)),sqrt(pp.σ2));

@@ -1,21 +1,20 @@
 ## random genetic (or other) effects
-function topiclmm{U<:PostPredSS}(y,X,Z,pss0::VectorPosterior{U},K::Int64;
+function topiclmm{U<:PostPredSS}(y,X,Z,docrng,pss0::Vector{U},K::Int64;
                            hy::Dict{Symbol,Float64}=hyperparameter(),
-                           init::TLMMsample=init_params(K,length(y),size(X,1)),
+                           init::TLMMsample=init_params(K,length(docrng),size(X,1)),
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
-  Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
-  n = length(y);
+  n = length(docrng);
   Base.Test.@test size(X)[2] == n;
   p = size(X,1);
-  nd = size.(y,2);
+  nd = length.(docrng);
 
   if !isdefined(init,:z)
       init.z = init_z(init.η,K,nd)
   end
   topic = init_topic(pss0,K,init.z,y);
-  nk = hcat(countz.(init.z,K)...);
+  nk = [];
 
   ZtZ = Z'Z;
   XtX = X'X;
@@ -27,19 +26,20 @@ function topiclmm{U<:PostPredSS}(y,X,Z,pss0::VectorPosterior{U},K::Int64;
   iter = maximum(saveiter);
 
   samples = Vector{TLMMsample}(nsave);
-  tss = Matrix{VectorPosterior{U}}(K,nsave);
+  tss = Matrix{Vector{U}}(K,nsave);
   s = init;
 
   for t in 1:iter
 
     ##  sample topic memberships
     for i in 1:n
-      sample_z!(s.z[i],topic,view(nk,:,i),softmax(s.η[:,i]),y[i],K);
+      sample_z!(view(s.z,docrng[i]),topic,softmax(s.η[:,i]),y[:,docrng[i]],K);
     end
+    nk = countz(s.z,docrng,K);
 
     for k in 1:K
       ## sample η and λ
-      iΣ = makecov(XtX,ZtZ,hy[:τ_β],s.τ_u[k],s.τ_μ);
+      iΣ = makeprec(XtX,ZtZ,hy[:τ_β],s.τ_u[k],s.τ_μ);
       iΣ_k = iΣ./s.σ2_η[k];
 
       nk = sample_η(s.η[k,:],s.η[vcat(1:(k-1),(k+1):end),:],iΣ_k,nd,nk[k,:]);
@@ -81,23 +81,22 @@ function topiclmm{U<:PostPredSS}(y,X,Z,pss0::VectorPosterior{U},K::Int64;
 end
 
 ## vanilla
-function topiclmm{U<:PostPredSS}(y,X,pss0::VectorPosterior{U},K::Int64;
+function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Int64;
                            hy::Dict{Symbol,Float64}=hyperparameter(),
-                           init::TLMMsample=init_params(K),
+                           init::TLMMsample=init_params(K,length(docrng),size(X,1)),
                            iter::Int=1000,thin::Int=1)
 
   ## initialize
-  Base.Test.@test maximum(pss0.span[length(pss0)]) == size(y[1])[1];
-  n = length(y);
+  n = length(docrng);
   Base.Test.@test size(X)[2] == n;
   p = size(X)[1];
-  nd = size.(y,2);
+  nd = length.(docrng);
 
   if !isdefined(init,:z)
-      init.z = init_z(init.η,K,nd)
+      init.z = init_z(init.η,K,docrng);
   end
   topic = init_topic(pss0,K,init.z,y);
-  nk = hcat(countz.(init.z,K)...);
+  #nk = countz(init.z,docrng,K);
 
   XtX = X'X;
   Lβ = inv( chol( X*X' + I*inv(hy[:τ_β])));
@@ -110,16 +109,17 @@ function topiclmm{U<:PostPredSS}(y,X,pss0::VectorPosterior{U},K::Int64;
   iter = maximum(saveiter);
 
   samples = Vector{TLMMsample}(nsave);
-  tss = Matrix{VectorPosterior{U}}(K,nsave);
+  tss = Matrix{Vector{U}}(K,nsave);
   s = init;
 
   for t in 1:iter
 
-      iΣ = makecov(XtX,hy[:τ_β],τ_μ);
+      iΣ = makeprec(XtX,hy[:τ_β],s.τ_μ);
     ##  sample topic memberships
     for i in 1:n
-      sample_z!(s.z[i],topic,view(nk,:,i),softmax(s.η[:,i]),y[i],K);
+      sample_z!(view(s.z,docrng[i]),topic,softmax(s.η[:,i]),y[:,docrng[i]],K);
     end
+    nk = countz(s.z,docrng,K);
 
     for k in 1:K
     ## sample η and λ

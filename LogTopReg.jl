@@ -4,11 +4,7 @@ using Distributions
 using StatsBase
 using StatsFuns
 using PolyaGamma
-using RCall
-import Base.length
-import Base.getindex
 import Base.rand
-import Base.vcat
 import Base.mean
 
 abstract type PostPredSS end
@@ -18,13 +14,13 @@ export
   TLMMsample,
   TLMMfit,
   PostPredSS,
-  VectorPosterior,
   PoissonPosterior,
   DirMultPosterior,
   CategoricalPosterior,
   NormalMeanPosterior,
 
   #functions
+  gf,
   simplemix,
   hyperparameter,
   refβ,
@@ -35,12 +31,8 @@ export
   topicpd,
   topicppd,
   softmax,
-  vcat,
-  getindex,
   rand,
-  length,
   sim_dat,
-  mlinit_dirichlet,
   randtopic,
   init_params,
   init_params!,
