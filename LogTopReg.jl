@@ -36,6 +36,7 @@ export
   randtopic,
   init_params,
   init_params!,
+  init_z,
 
   #the whole point
   topiclmm

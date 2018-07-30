@@ -1,10 +1,9 @@
-function sample_z!(z,topic,nk,π,y,K)
+function sample_z!(z,topic,π,y,K)
 
   logpost = Vector{Float64}(K);
   for j in 1:length(z)
     zj = z[j];
     pullsample!(topic[zj],y[:,j]);
-    nk[zj] -= 1;
 
     for k in 1:K
       logpost[k] = log(π[k]) + lppd(y[:,j],topic[k]);
@@ -13,7 +12,6 @@ function sample_z!(z,topic,nk,π,y,K)
     z[j] = rand(Categorical(exp.(logpostnorm)));
 
     addsample!(topic[z[j]],y[:,j]);
-    nk[z[j]] += 1;
   end
 end
 
@@ -28,7 +26,7 @@ function sample_η(η::Vector{Float64},ηp::Array{Float64,2},
     w[i] = nk[i] - nd[i]/2 + c*λ;
     iΣ[i,i] += λ;
   end
-  return iΣ \ w + chol(Hermitian(iΣ)) \ randn(n)
+  return iΣ \ w + cholfact(Hermitian(iΣ),Val{true})[:U] \ randn(n)
 end
 
 function sample_variance(y::Vector{Float64},V::Array{Float64,2},ν0::Float64,σ0::Float64)

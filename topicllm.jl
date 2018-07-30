@@ -11,7 +11,7 @@ function topiclmm{U<:PostPredSS}(y,X,Z,docrng,pss0::Vector{U},K::Int64;
   nd = length.(docrng);
 
   if !isdefined(init,:z)
-      init.z = init_z(init.η,K,nd)
+      init.z = init_z(init.η,K,docrng)
   end
   topic = init_topic(pss0,K,init.z,y);
   nk = [];
@@ -121,22 +121,24 @@ function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Int64;
     end
     nk = countz(s.z,docrng,K);
 
-    for k in 1:K
-    ## sample η and λ
-      iΣ_k = iΣ./s.σ2_η[k];
+    if K > 1
+        for k in 1:K
+            ## sample η and λ
+            iΣ_k = iΣ./s.σ2_η[k];
 
-      ηk = sample_η(s.η[k,:],s.η[vcat(1:(k-1),(k+1):end),:],iΣ_k,nd,nk[k,:]);
-      s.η[k,:] = ηk;
+            ηk = sample_η(s.η[k,:],s.η[vcat(1:(k-1),(k+1):end),:],iΣ_k,nd,nk[k,:]);
+            s.η[k,:] = ηk;
 
-      s.σ2_η[k] = sample_variance(ηk,iΣ,hy[:ν0_σ2η],hy[:σ0_σ2η]);
+            s.σ2_η[k] = sample_variance(ηk,iΣ,hy[:ν0_σ2η],hy[:σ0_σ2η]);
 
-      σ2hat = s.σ2_η[k]/(1/s.τ_μ + suminvaddIτXtX);
-      μhat = σ2hat/s.σ2_η[k]*sum(invaddIτXtX*ηk);
-      s.μ[k] = randn()*sqrt(σ2hat) + μhat;
+            σ2hat = s.σ2_η[k]/(1/s.τ_μ + suminvaddIτXtX);
+            μhat = σ2hat/s.σ2_η[k]*sum(invaddIτXtX*ηk);
+            s.μ[k] = randn()*sqrt(σ2hat) + μhat;
 
-      s.β[:,k] = ΣβX*(s.η[k,:] .- s.μ[k]) + sqrt(s.σ2_η[k]).*Lβ*randn(p);
+            s.β[:,k] = ΣβX*(s.η[k,:] .- s.μ[k]) + sqrt(s.σ2_η[k]).*Lβ*randn(p);
+        end
+        s.τ_μ = sample_variance(s.μ./s.σ2_η,1.0,hy[:ν0_τ],hy[:τ0_τ]);
     end
-    s.τ_μ = sample_variance(s.μ./s.σ2_η,1.0,hy[:ν0_τ],hy[:τ0_τ]);
 
     ## save samples
     if t ∈ saveiter
@@ -147,4 +149,8 @@ function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Int64;
   end
 
   return TLMMfit(samples,tss,pss0,hy);
+end
+
+function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Val{1})
+
 end

@@ -31,6 +31,30 @@ function init_params(K::Int,n::Int,p::Int)
     return init_params!(TLMMsample(),K,n,p);
 end
 
+function mean(samps::Vector{TLMMsample})
+    meanfit = TLMMsample();
+    tmp = gf(samps,:τ_μ);
+    meanfit.τ_μ = mean(tmp);
+    tmp = gf(samps,:σ2_η);
+    meanfit.σ2_η = squeeze(mean(tmp,ndims(tmp)),ndims(tmp));
+    tmp = gf(samps,:η);
+    meanfit.η = squeeze(mean(tmp,ndims(tmp)),ndims(tmp));
+    tmp = gf(samps,:μ);
+    meanfit.μ = squeeze(mean(tmp,ndims(tmp)),ndims(tmp));
+    tmp = gf(samps,:β);
+    meanfit.β = squeeze(mean(tmp,ndims(tmp)),ndims(tmp));
+
+    if isdefined(samps[1],:u)
+        tmp = gf(samps,:u);
+        meanfit.u = squeeze(mean(tmp,ndims(tmp)),ndims(tmp));
+        tmp = gf(samps,:τ_u);
+        meanfit.τ_u = squeeze(mean(tmp,ndims(tmp)),ndims(tmp));
+    end
+
+    return meanfit
+end
+
+
 struct TLMMfit{U<:PostPredSS}
     θ::Vector{TLMMsample}
     tss::Matrix{Vector{U}}
