@@ -39,7 +39,8 @@ export
   init_z,
 
   #the whole point
-  topiclmm
+  topiclmm,
+  topiclmm_uncollapsed
 
 include("vectorposterior.jl")
 include("outputtype.jl")

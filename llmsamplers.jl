@@ -1,18 +1,36 @@
-function sample_z!(z,topic,π,y,K)
+#collapsed sampler
+function sample_z!(z,y,topic,π)
+    K = length(logπ);
+    logpost = Vector{Float64}(K);
+    for j in 1:length(z)
+        zj = z[j];
+        pullsample!(topic[zj],y[:,j]);
 
-  logpost = Vector{Float64}(K);
-  for j in 1:length(z)
-    zj = z[j];
-    pullsample!(topic[zj],y[:,j]);
+        for k in 1:K
+            logpost[k] = log(π[k]) + lppd(y[:,j],topic[k]);
+        end
+        logpostnorm = logpost - logsumexp(logpost);
+        z[j] = rand(Categorical(exp.(logpostnorm)));
 
-    for k in 1:K
-      logpost[k] = log(π[k]) + lppd(y[:,j],topic[k]);
+        addsample!(topic[z[j]],y[:,j]);
     end
-    logpostnorm = logpost - logsumexp(logpost);
-    z[j] = rand(Categorical(exp.(logpostnorm)));
+end
 
-    addsample!(topic[z[j]],y[:,j]);
-  end
+#for uncollapsed sampler
+function sample_z(y,topicparam,π)
+    K = length(π);
+    logpost = Vector{Float64}(K);
+    z = Vector{Int}(size(y,2));
+
+    for j in 1:length(z)
+        for k in 1:K
+            logpost[k] = log(π[k]) + sum(logpdf.(topicparam[k],y[:,j]));
+        end
+        logpostnorm = logpost - logsumexp(logpost);
+        z[j] = rand(Categorical(exp.(logpostnorm)));
+    end
+
+    return z;
 end
 
 function sample_η(η::Vector{Float64},ηp::Array{Float64,2},
@@ -28,6 +46,22 @@ function sample_η(η::Vector{Float64},ηp::Array{Float64,2},
   end
   return iΣ \ w + cholfact(Hermitian(iΣ),Val{true})[:U] \ randn(n)
 end
+
+function sample_η(η::Vector{Float64},μ::Float64,σ2::Float64,ηp::Array{Float64,2},
+    nd::Vector{Int64},nk::Vector{Int64})
+  n = length(nd);
+  w = Vector{Float64}(n);
+  iΣ = eye(n)/σ2;
+  for i in 1:n
+    c = logsumexp(ηp[:,i]);
+    ρ = η[i] - c;
+    λ = rpolyagamma(ρ,nd[i]);
+    w[i] = μ/σ2 + nk[i] - nd[i]/2 + c*λ;
+    iΣ[i,i] += λ;
+  end
+  return iΣ \ w + cholfact(Hermitian(iΣ),Val{true})[:U] \ randn(n)
+end
+
 
 function sample_variance(y::Vector{Float64},V::Array{Float64,2},ν0::Float64,σ0::Float64)
   a = 0.5(length(y)+ν0);

@@ -33,7 +33,7 @@ function topiclmm{U<:PostPredSS}(y,X,Z,docrng,pss0::Vector{U},K::Int64;
 
     ##  sample topic memberships
     for i in 1:n
-      sample_z!(view(s.z,docrng[i]),topic,softmax(s.η[:,i]),y[:,docrng[i]],K);
+      sample_z!(view(s.z,docrng[i]),y[:,docrng[i]],topic,softmax(s.η[:,i]));
     end
     nk = countz(s.z,docrng,K);
 
@@ -117,7 +117,7 @@ function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Int64;
       iΣ = makeprec(XtX,hy[:τ_β],s.τ_μ);
     ##  sample topic memberships
     for i in 1:n
-      sample_z!(view(s.z,docrng[i]),topic,softmax(s.η[:,i]),y[:,docrng[i]],K);
+        sample_z!(view(s.z,docrng[i]),y[:,docrng[i]],topic,softmax(s.η[:,i]));
     end
     nk = countz(s.z,docrng,K);
 
@@ -149,8 +149,4 @@ function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Int64;
   end
 
   return TLMMfit(samples,tss,pss0,hy);
-end
-
-function topiclmm{U<:PostPredSS}(y,X,docrng,pss0::Vector{U},K::Val{1})
-
 end
