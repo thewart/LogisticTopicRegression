@@ -1,4 +1,4 @@
-function topiclmm{U<:PostPredSS,D<:Sampleable}(y,X,docrng,pss0::Vector{U},
+function topiclmm_uncollapsed{U<:PostPredSS,D<:Sampleable}(y,X,docrng,pss0::Vector{U},
     topicparam::Vector{Vector{D}},K;
     hy::Dict{Symbol,Float64}=hyperparameter(),
     init::TLMMsample=init_params(K,length(docrng),size(X,1)),

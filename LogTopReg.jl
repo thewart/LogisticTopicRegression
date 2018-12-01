@@ -1,3 +1,4 @@
+include("/home/seth/code/polyagamma/PolyaGamma.jl")
 module LogTopReg
 
 using Distributions
