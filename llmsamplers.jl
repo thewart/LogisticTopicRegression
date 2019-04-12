@@ -62,7 +62,6 @@ function sample_η(η::Vector{Float64},μ::Float64,σ2::Float64,ηp::Array{Float
   return iΣ \ w + cholfact(Hermitian(iΣ),Val{true})[:U] \ randn(n)
 end
 
-
 function sample_variance(y::Vector{Float64},V::Array{Float64,2},ν0::Float64,σ0::Float64)
   a = 0.5(length(y)+ν0);
   b = 0.5(σ0*ν0 + dot(y,V*y));

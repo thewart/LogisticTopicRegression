@@ -13,9 +13,10 @@ mutable struct TLMMsample
     TLMMsample() = new()
 end
 
-function init_params!(samp::TLMMsample,K::Int,n::Int,p::Int;ranef=false)
+function init_params!(samp::TLMMsample,K::Int,n::Int,p::Int;
+    ranef=false,collapsed=false)
+
     samp.η = rand(K,n)*2;
-    samp.τ_μ = exp(randn())*2;
     samp.σ2_η = rand(K)*2;
 
     samp.μ = Vector{Float64}(K);
@@ -24,6 +25,10 @@ function init_params!(samp::TLMMsample,K::Int,n::Int,p::Int;ranef=false)
         samp.u = Matrix{Float64}(n,K);
         samp.τ_u = exp.(randn(K));
     end
+    if collapsed
+        samp.τ_μ = exp(randn())*2;
+    end
+
     return samp
 end
 
